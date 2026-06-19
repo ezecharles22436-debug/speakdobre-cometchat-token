@@ -1,63 +1,333 @@
+const MEMBERSTACK_BASE_URL = "https://admin.memberstack.com";
+
 module.exports = async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  setCors(req, res);
 
   if (req.method === "OPTIONS") {
-    return res.status(200).end();
+    return res.status(204).end();
   }
 
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    res.setHeader("Allow", "POST, OPTIONS");
+    return res.status(405).json({ error: "Method not allowed." });
   }
 
   try {
-    const { uid, name } = req.body || {};
+    assertEnvironment();
+    assertAllowedOrigin(req);
 
-    if (!uid) {
-      return res.status(400).json({ error: "Missing uid" });
+    const sessionToken = readBearerToken(req.headers.authorization);
+    if (!sessionToken) {
+      return res.status(401).json({ error: "Authentication required." });
     }
 
-    const APP_ID = "1677376866e3f736f";
-    const REGION = "eu";
-    const API_KEY = process.env.COMETCHAT_API_KEY;
+    const verified = await verifyMemberstackToken(sessionToken);
+    const memberId = getVerifiedMemberId(verified);
 
-    if (!API_KEY) {
-      return res.status(500).json({ error: "Missing COMETCHAT_API_KEY" });
+    if (!memberId) {
+      return res.status(401).json({ error: "Invalid Memberstack session." });
     }
 
-    await fetch(`https://${APP_ID}.api-${REGION}.cometchat.io/v3/users`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: API_KEY
-      },
-      body: JSON.stringify({
-        uid: uid,
-        name: name || uid
-      })
-    });
+    const member = await getMemberstackMember(memberId);
+    if (!member || member.id !== memberId) {
+      return res.status(401).json({ error: "Member not found." });
+    }
 
-    const tokenRes = await fetch(
-      `https://${APP_ID}.api-${REGION}.cometchat.io/v3/users/${uid}/auth_tokens`,
-      {
-        method: "POST",
-        headers: {
-          apikey: API_KEY
-        }
-      }
-    );
+    const access = getPracticeChatAccess(member);
+    if (!access.allowed) {
+      return res.status(403).json({
+        error: "Practice Chat access has expired.",
+        code: "CHAT_ACCESS_EXPIRED"
+      });
+    }
 
-    const tokenData = await tokenRes.json();
+    const fields = member.customFields || {};
+    const firstName = cleanText(fields["first-name"], 80);
+    const lastName = cleanText(fields["last-name"], 80);
+    const email = cleanText(member.auth?.email, 254);
+    const name = cleanText(`${firstName} ${lastName}`.trim() || email || "SpeakDobre Member", 100);
+    const uid = member.id;
 
+    await ensureCometChatUser(uid, name);
+    const token = await createCometChatToken(uid);
+
+    res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
-      token: tokenData?.data?.authToken || null,
-      raw: tokenData
+      token,
+      user: {
+        uid,
+        name
+      },
+      access: {
+        type: access.type,
+        trialEnd: access.trialEnd ? new Date(access.trialEnd).toISOString() : null
+      }
     });
-  } catch (err) {
-    return res.status(500).json({
-      error: "Server error",
-      details: err.message
-    });
+  } catch (error) {
+    console.error("CometChat token endpoint failed:", safeError(error));
+
+    if (error instanceof HttpError) {
+      return res.status(error.status).json({ error: error.publicMessage });
+    }
+
+    return res.status(500).json({ error: "Unable to open Practice Chat." });
   }
 };
+
+function assertEnvironment() {
+  const required = [
+    "MEMBERSTACK_SECRET_KEY",
+    "COMETCHAT_APP_ID",
+    "COMETCHAT_REGION",
+    "ALLOWED_ORIGINS"
+  ];
+
+  const missing = required.filter(name => !process.env[name]);
+  if (!process.env.COMETCHAT_API_KEY && !process.env.COMETCHAT_REST_API_KEY) {
+    missing.push("COMETCHAT_API_KEY");
+  }
+  if (!process.env.MEMBERSTACK_ALLOWED_PLAN_IDS && !process.env.MEMBERSTACK_ALLOWED_PLAN_NAMES) {
+    missing.push("MEMBERSTACK_ALLOWED_PLAN_IDS or MEMBERSTACK_ALLOWED_PLAN_NAMES");
+  }
+  if (missing.length) {
+    throw new Error(`Missing environment variables: ${missing.join(", ")}`);
+  }
+}
+
+function setCors(req, res) {
+  const allowedOrigins = allowedOriginSet();
+  const requestOrigin = req.headers.origin;
+
+  if (requestOrigin && allowedOrigins.has(requestOrigin)) {
+    res.setHeader("Access-Control-Allow-Origin", requestOrigin);
+    res.setHeader("Vary", "Origin");
+  }
+
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  res.setHeader("Access-Control-Max-Age", "86400");
+}
+
+function assertAllowedOrigin(req) {
+  const requestOrigin = req.headers.origin;
+  if (requestOrigin && !allowedOriginSet().has(requestOrigin)) {
+    throw new HttpError(403, "Origin not allowed.");
+  }
+}
+
+function allowedOriginSet() {
+  return csvSet(
+    process.env.ALLOWED_ORIGINS ||
+    "https://speakdobre.com,https://www.speakdobre.com"
+  );
+}
+
+function readBearerToken(header) {
+  if (typeof header !== "string" || !header.startsWith("Bearer ")) return null;
+  const token = header.slice(7).trim();
+  return token || null;
+}
+
+async function verifyMemberstackToken(token) {
+  const response = await fetch(`${MEMBERSTACK_BASE_URL}/members/verify-token`, {
+    method: "POST",
+    headers: memberstackHeaders(),
+    body: JSON.stringify({ token })
+  });
+
+  const payload = await readJson(response);
+  if (!response.ok) {
+    throw new HttpError(401, "Invalid Memberstack session.", payload);
+  }
+
+  return payload?.data || payload;
+}
+
+function getVerifiedMemberId(payload) {
+  return payload?.id ||
+    payload?.memberId ||
+    payload?.sub ||
+    payload?.payload?.id ||
+    payload?.payload?.sub ||
+    null;
+}
+
+async function getMemberstackMember(memberId) {
+  const response = await fetch(
+    `${MEMBERSTACK_BASE_URL}/members/${encodeURIComponent(memberId)}`,
+    { headers: memberstackHeaders(false) }
+  );
+
+  const payload = await readJson(response);
+  if (!response.ok) {
+    throw new HttpError(502, "Unable to verify Practice Chat access.", payload);
+  }
+
+  return payload?.data || null;
+}
+
+function memberstackHeaders(withJson = true) {
+  const headers = {
+    "X-API-KEY": process.env.MEMBERSTACK_SECRET_KEY,
+    "Accept": "application/json"
+  };
+  if (withJson) headers["Content-Type"] = "application/json";
+  return headers;
+}
+
+function getPracticeChatAccess(member) {
+  const now = Date.now();
+  const trialDays = positiveNumber(process.env.TRIAL_DAYS, 3);
+  const fields = member.customFields || {};
+  const allowedPlanIds = csvSet(process.env.MEMBERSTACK_ALLOWED_PLAN_IDS);
+  const allowedPlanNames = csvSet(process.env.MEMBERSTACK_ALLOWED_PLAN_NAMES, true);
+  const plans = Array.isArray(member.planConnections) ? member.planConnections : [];
+
+  const hasAllowedPlan = plans.some(connection => {
+    const active = connection.active === true ||
+      String(connection.status || "").toUpperCase() === "ACTIVE";
+    if (!active) return false;
+
+    const planId = String(connection.planId || "").trim();
+    const planName = String(connection.planName || "").trim().toLowerCase();
+    return allowedPlanIds.has(planId) || allowedPlanNames.has(planName);
+  });
+
+  if (hasAllowedPlan) {
+    return { allowed: true, type: "paid", trialEnd: null };
+  }
+
+  // Temporary compatibility with the old custom field. Remove after plan IDs are configured.
+  const legacyPlan = String(fields.plan || "").trim().toLowerCase();
+  if (["paid", "premium", "active", "practice chat"].includes(legacyPlan)) {
+    return { allowed: true, type: "paid", trialEnd: null };
+  }
+
+  const trialStart = parseDate(fields.trialStart) ||
+    parseDate(fields["trial-start"]) ||
+    parseDate(member.createdAt);
+
+  if (trialStart) {
+    const trialEnd = trialStart + trialDays * 86400000;
+    if (now < trialEnd) {
+      return { allowed: true, type: "trial", trialEnd };
+    }
+  }
+
+  return { allowed: false, type: "expired", trialEnd: null };
+}
+
+async function ensureCometChatUser(uid, name) {
+  const existing = await cometChatRequest(`/users/${encodeURIComponent(uid)}`, {
+    method: "GET",
+    allowNotFound: true
+  });
+
+  if (existing) return;
+
+  await cometChatRequest("/users", {
+    method: "POST",
+    body: { uid, name }
+  });
+}
+
+async function createCometChatToken(uid) {
+  const payload = await cometChatRequest(
+    `/users/${encodeURIComponent(uid)}/auth_tokens`,
+    { method: "POST", body: {} }
+  );
+
+  const token = payload?.data?.authToken ||
+    payload?.authToken ||
+    payload?.data?.token ||
+    payload?.token;
+
+  if (!token) {
+    throw new Error("CometChat did not return an auth token.");
+  }
+  return token;
+}
+
+async function cometChatRequest(path, options = {}) {
+  const base = `https://${process.env.COMETCHAT_APP_ID}.api-${process.env.COMETCHAT_REGION}.cometchat.io/v3`;
+  const response = await fetch(`${base}${path}`, {
+    method: options.method || "GET",
+    headers: {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "apiKey": process.env.COMETCHAT_API_KEY || process.env.COMETCHAT_REST_API_KEY
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+  });
+
+  if (response.status === 404 && options.allowNotFound) return null;
+
+  const payload = await readJson(response);
+  if (!response.ok) {
+    throw new HttpError(502, "Unable to connect to CometChat.", payload);
+  }
+  return payload;
+}
+
+async function readJson(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text.slice(0, 500) };
+  }
+}
+
+function parseDate(value) {
+  if (!value) return null;
+  if (typeof value === "number") {
+    return value < 100000000000 ? value * 1000 : value;
+  }
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return numeric < 100000000000 ? numeric * 1000 : numeric;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function positiveNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function csvSet(value, lowercase = false) {
+  return new Set(
+    String(value || "")
+      .split(",")
+      .map(item => item.trim())
+      .filter(Boolean)
+      .map(item => lowercase ? item.toLowerCase() : item)
+  );
+}
+
+function cleanText(value, maxLength) {
+  return String(value || "")
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function safeError(error) {
+  return {
+    name: error?.name,
+    message: error?.message,
+    status: error?.status
+  };
+}
+
+class HttpError extends Error {
+  constructor(status, publicMessage, details) {
+    super(publicMessage);
+    this.name = "HttpError";
+    this.status = status;
+    this.publicMessage = publicMessage;
+    this.details = details;
+  }
+}
