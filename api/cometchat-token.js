@@ -50,6 +50,7 @@ module.exports = async function handler(req, res) {
 
     await ensureCometChatUser(uid, name);
     const token = await createCometChatToken(uid);
+    const rooms = await getVisibleRoomsForUser(uid);
 
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
@@ -58,6 +59,7 @@ module.exports = async function handler(req, res) {
         uid,
         name
       },
+      rooms,
       access: {
         type: access.type,
         trialEnd: access.trialEnd ? new Date(access.trialEnd).toISOString() : null
@@ -248,6 +250,74 @@ async function createCometChatToken(uid) {
   return token;
 }
 
+async function getVisibleRoomsForUser(uid) {
+  const rooms = configuredRooms();
+
+  return Promise.all(
+    rooms.map(async room => {
+      const unlocked = await isCometChatGroupMember(room.guid, uid);
+      return {
+        guid: room.guid,
+        name: room.name,
+        level: room.level || "",
+        description: room.description || "",
+        unlocked
+      };
+    })
+  );
+}
+
+function configuredRooms() {
+  const raw = String(process.env.SPEAKDOBRE_CHAT_ROOMS || "").trim();
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map(room => ({
+            guid: cleanText(room.guid, 120),
+            name: cleanText(room.name, 120),
+            level: cleanText(room.level, 40),
+            description: cleanText(room.description, 180)
+          }))
+          .filter(room => room.guid && room.name);
+      }
+    } catch (error) {
+      console.warn("Invalid SPEAKDOBRE_CHAT_ROOMS JSON:", error?.message);
+    }
+  }
+
+  return [
+    {
+      guid: "speakdobre-a1",
+      name: "SpeakDobre A1 Practice",
+      level: "A1",
+      description: "For beginner speaking practice."
+    },
+    {
+      guid: "speakdobre-b1",
+      name: "SpeakDobre B1 Practice",
+      level: "B1",
+      description: "For confident everyday conversations."
+    },
+    {
+      guid: "speakdobre-travel",
+      name: "Travel English",
+      level: "Travel",
+      description: "Practice English for trips, airports and hotels."
+    }
+  ];
+}
+
+async function isCometChatGroupMember(guid, uid) {
+  const payload = await cometChatRequest(
+    `/groups/${encodeURIComponent(guid)}/members/${encodeURIComponent(uid)}`,
+    { method: "GET", allowNotFound: true }
+  );
+
+  return Boolean(payload);
+}
+
 async function cometChatRequest(path, options = {}) {
   const base = `https://${process.env.COMETCHAT_APP_ID}.api-${process.env.COMETCHAT_REGION}.cometchat.io/v3`;
   const response = await fetch(`${base}${path}`, {
@@ -260,7 +330,7 @@ async function cometChatRequest(path, options = {}) {
     body: options.body === undefined ? undefined : JSON.stringify(options.body)
   });
 
-  if (response.status === 404 && options.allowNotFound) return null;
+  if ([400, 403, 404].includes(response.status) && options.allowNotFound) return null;
 
   const payload = await readJson(response);
   if (!response.ok) {
