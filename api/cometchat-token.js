@@ -185,6 +185,20 @@ function getPracticeChatAccess(member) {
   const allowedPlanNames = csvSet(process.env.MEMBERSTACK_ALLOWED_PLAN_NAMES, true);
   const plans = Array.isArray(member.planConnections) ? member.planConnections : [];
 
+  const explicitTrialStart = parseDate(fields.trialStart) ||
+    parseDate(fields["trial-start"]);
+  const explicitTrialEnd = parseDate(fields.trialEnd) ||
+    parseDate(fields["trial-end"]);
+
+  if (explicitTrialStart || explicitTrialEnd) {
+    const trialEnd = explicitTrialEnd ||
+      (explicitTrialStart ? explicitTrialStart + trialDays * 86400000 : null);
+
+    if (trialEnd && now < trialEnd) {
+      return { allowed: true, type: "trial", trialEnd };
+    }
+  }
+
   const hasAllowedPlan = plans.some(connection => {
     const active = connection.active === true ||
       String(connection.status || "").toUpperCase() === "ACTIVE";
@@ -205,9 +219,7 @@ function getPracticeChatAccess(member) {
     return { allowed: true, type: "paid", trialEnd: null };
   }
 
-  const trialStart = parseDate(fields.trialStart) ||
-    parseDate(fields["trial-start"]) ||
-    parseDate(member.createdAt);
+  const trialStart = parseDate(member.createdAt);
 
   if (trialStart) {
     const trialEnd = trialStart + trialDays * 86400000;
