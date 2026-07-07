@@ -290,21 +290,99 @@ function configuredRooms() {
   return [
     {
       guid: "speakdobre-a1",
-      name: "SpeakDobre A1 Practice",
-      level: "A1",
-      description: "For beginner speaking practice."
+      name: "A1–A2 Beginners",
+      level: "A1–A2",
+      description: "For beginners building basic speaking confidence."
     },
     {
       guid: "speakdobre-b1",
-      name: "SpeakDobre B1 Practice",
-      level: "B1",
-      description: "For confident everyday conversations."
+      name: "B1–B2 Intermediate",
+      level: "B1–B2",
+      description: "For confident everyday conversations and smoother fluency."
     },
     {
       guid: "speakdobre-travel",
       name: "Travel English",
       level: "Travel",
       description: "Practice English for trips, airports and hotels."
+    },
+    {
+      guid: "speakdobre-c1",
+      name: "C1 Advanced",
+      level: "C1",
+      description: "For advanced discussions, precision and natural expression."
+    },
+    {
+      guid: "speakdobre-c2",
+      name: "C2 Mastery",
+      level: "C2",
+      description: "For near-native fluency, nuance and mastery."
+    },
+    {
+      guid: "speakdobre-business",
+      name: "Business English",
+      level: "Business",
+      description: "Practice workplace communication, meetings and professional English."
+    },
+    {
+      guid: "speakdobre-job-interview",
+      name: "Job Interview",
+      level: "Career",
+      description: "Prepare for interviews, self-presentation and career conversations."
+    },
+    {
+      guid: "speakdobre-ielts-toefl",
+      name: "Practice IELTS/TOEFL Preparation",
+      level: "Exam Prep",
+      description: "Practice speaking, writing and exam-focused communication."
+    },
+    {
+      guid: "speakdobre-listening-reading",
+      name: "Listening/Reading Club",
+      level: "Skills",
+      description: "Discuss articles, audio, stories and comprehension practice."
+    },
+    {
+      guid: "speakdobre-movies-tv",
+      name: "Movies & TV",
+      level: "Interest",
+      description: "Practice English through films, series and entertainment."
+    },
+    {
+      guid: "speakdobre-music-lovers",
+      name: "Music Lovers",
+      level: "Interest",
+      description: "Talk about songs, artists, lyrics and music culture."
+    },
+    {
+      guid: "speakdobre-sports-gaming",
+      name: "Sports/Gaming",
+      level: "Interest",
+      description: "Discuss sports, games, teams, tournaments and hobbies."
+    },
+    {
+      guid: "speakdobre-food-cooking",
+      name: "Food & Cooking",
+      level: "Interest",
+      description: "Practice English through recipes, food culture and cooking."
+    },
+    {
+      guid: "speakdobre-culture-exchange",
+      name: "Culture Exchange",
+      level: "Community",
+      description: "Share traditions, places, habits and cultural experiences."
+    },
+    {
+      guid: "speakdobre-ukrainian-gossip",
+      name: "Ukrainian Gossip Community",
+      level: "Community",
+      description: "Casual community talk for Ukrainian topics and social conversation."
+    },
+    {
+      guid: "speakdobre-international-gossip",
+      name: "International Gossip Community",
+      level: "Community",
+      description: "Casual global conversation about people, trends and everyday stories."
     }
   ];
 }
