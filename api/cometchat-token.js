@@ -181,6 +181,14 @@ function getPracticeChatAccess(member) {
   const now = Date.now();
   const trialDays = positiveNumber(process.env.TRIAL_DAYS, 3);
   const fields = member.customFields || {};
+  const practiceChatStatus = String(fields.practiceChatStatus || fields["practice-chat-status"] || "")
+    .trim()
+    .toLowerCase();
+
+  if (["cancelled", "canceled", "failed", "payment failed", "expired", "inactive"].includes(practiceChatStatus)) {
+    return { allowed: false, type: practiceChatStatus || "expired", trialEnd: null };
+  }
+
   const allowedPlanIds = csvSet(process.env.MEMBERSTACK_ALLOWED_PLAN_IDS);
   const allowedPlanNames = csvSet(process.env.MEMBERSTACK_ALLOWED_PLAN_NAMES, true);
   const plans = Array.isArray(member.planConnections) ? member.planConnections : [];
