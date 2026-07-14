@@ -180,23 +180,83 @@ function memberstackHeaders(withJson = true) {
 function getPracticeChatAccess(member) {
   const now = Date.now();
   const trialDays = positiveNumber(process.env.TRIAL_DAYS, 3);
-  const fields = member.customFields || {};
-  const practiceChatStatus = String(fields.practiceChatStatus || fields["practice-chat-status"] || "")
+  const fields = member.customFields || member.custom_fields || {};
+  const practiceChatStatus = String(
+    firstValue(fields, [
+      "practiceChatStatus",
+      "practice-chat-status",
+      "practice_chat_status",
+      "subscriptionStatus",
+      "subscription-status",
+      "subscription_status"
+    ])
+  )
     .trim()
     .toLowerCase();
-
-  if (["cancelled", "canceled", "failed", "payment failed", "expired", "inactive"].includes(practiceChatStatus)) {
-    return { allowed: false, type: practiceChatStatus || "expired", trialEnd: null };
-  }
+  const lastPaymentStatus = String(
+    firstValue(fields, [
+      "practiceChatLastPaymentStatus",
+      "practice-chat-last-payment-status",
+      "practice_chat_last_payment_status",
+      "lastPaymentStatus",
+      "last-payment-status",
+      "last_payment_status"
+    ])
+  )
+    .trim()
+    .toLowerCase();
+  const cancelledAt = String(
+    firstValue(fields, [
+      "practiceChatCancelledAt",
+      "practice-chat-cancelled-at",
+      "practice_chat_cancelled_at",
+      "cancelledAt",
+      "cancelled-at",
+      "cancelled_at"
+    ])
+  ).trim();
 
   const allowedPlanIds = csvSet(process.env.MEMBERSTACK_ALLOWED_PLAN_IDS);
   const allowedPlanNames = csvSet(process.env.MEMBERSTACK_ALLOWED_PLAN_NAMES, true);
   const plans = Array.isArray(member.planConnections) ? member.planConnections : [];
 
-  const explicitTrialStart = parseDate(fields.trialStart) ||
-    parseDate(fields["trial-start"]);
-  const explicitTrialEnd = parseDate(fields.trialEnd) ||
-    parseDate(fields["trial-end"]);
+  const hasAllowedPlan = plans.some(connection => {
+    const active = connection.active === true ||
+      String(connection.status || "").toUpperCase() === "ACTIVE";
+    if (!active) return false;
+
+    const planId = String(connection.planId || connection.id || connection.plan?.id || "").trim();
+    const planName = String(connection.planName || connection.name || connection.plan?.name || "").trim().toLowerCase();
+    return allowedPlanIds.has(planId) || allowedPlanNames.has(planName);
+  });
+
+  if (hasAllowedPlan) {
+    return { allowed: true, type: "paid", trialEnd: null };
+  }
+
+  if (["active", "paid", "premium", "subscribed", "success"].includes(practiceChatStatus) ||
+      ["active", "paid", "premium", "subscribed", "success"].includes(lastPaymentStatus)) {
+    return { allowed: true, type: "paid", trialEnd: null };
+  }
+
+  if (
+    cancelledAt ||
+    ["cancelled", "canceled", "failed", "payment failed", "expired", "inactive", "unsubscribed"].includes(practiceChatStatus) ||
+    ["cancelled", "canceled", "failed", "payment failed", "expired", "inactive", "unsubscribed"].includes(lastPaymentStatus)
+  ) {
+    return { allowed: false, type: practiceChatStatus || lastPaymentStatus || "expired", trialEnd: null };
+  }
+
+  const explicitTrialStart = parseDate(firstValue(fields, [
+    "trialStart",
+    "trial-start",
+    "trial_start"
+  ]));
+  const explicitTrialEnd = parseDate(firstValue(fields, [
+    "trialEnd",
+    "trial-end",
+    "trial_end"
+  ]));
 
   if (explicitTrialStart || explicitTrialEnd) {
     const trialEnd = explicitTrialEnd ||
@@ -205,20 +265,6 @@ function getPracticeChatAccess(member) {
     if (trialEnd && now < trialEnd) {
       return { allowed: true, type: "trial", trialEnd };
     }
-  }
-
-  const hasAllowedPlan = plans.some(connection => {
-    const active = connection.active === true ||
-      String(connection.status || "").toUpperCase() === "ACTIVE";
-    if (!active) return false;
-
-    const planId = String(connection.planId || "").trim();
-    const planName = String(connection.planName || "").trim().toLowerCase();
-    return allowedPlanIds.has(planId) || allowedPlanNames.has(planName);
-  });
-
-  if (hasAllowedPlan) {
-    return { allowed: true, type: "paid", trialEnd: null };
   }
 
   // Temporary compatibility with the old custom field. Remove after plan IDs are configured.
@@ -237,6 +283,17 @@ function getPracticeChatAccess(member) {
   }
 
   return { allowed: false, type: "expired", trialEnd: null };
+}
+
+function firstValue(source, keys) {
+  if (!source || typeof source !== "object") return "";
+  for (const key of keys) {
+    const value = source[key];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return value;
+    }
+  }
+  return "";
 }
 
 async function ensureCometChatUser(uid, name) {
