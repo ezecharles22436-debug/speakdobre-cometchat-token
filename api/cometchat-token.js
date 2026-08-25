@@ -178,44 +178,7 @@ function memberstackHeaders(withJson = true) {
 }
 
 function getPracticeChatAccess(member) {
-  const now = Date.now();
-  const trialDays = positiveNumber(process.env.TRIAL_DAYS, 3);
   const fields = member.customFields || member.custom_fields || {};
-  const practiceChatStatus = String(
-    firstValue(fields, [
-      "practiceChatStatus",
-      "practice-chat-status",
-      "practice_chat_status",
-      "subscriptionStatus",
-      "subscription-status",
-      "subscription_status"
-    ])
-  )
-    .trim()
-    .toLowerCase();
-  const lastPaymentStatus = String(
-    firstValue(fields, [
-      "practiceChatLastPaymentStatus",
-      "practice-chat-last-payment-status",
-      "practice_chat_last_payment_status",
-      "lastPaymentStatus",
-      "last-payment-status",
-      "last_payment_status"
-    ])
-  )
-    .trim()
-    .toLowerCase();
-  const cancelledAt = String(
-    firstValue(fields, [
-      "practiceChatCancelledAt",
-      "practice-chat-cancelled-at",
-      "practice_chat_cancelled_at",
-      "cancelledAt",
-      "cancelled-at",
-      "cancelled_at"
-    ])
-  ).trim();
-
   const allowedPlanIds = csvSet(process.env.MEMBERSTACK_ALLOWED_PLAN_IDS);
   const allowedPlanNames = csvSet(process.env.MEMBERSTACK_ALLOWED_PLAN_NAMES, true);
   const plans = Array.isArray(member.planConnections) ? member.planConnections : [];
@@ -231,57 +194,12 @@ function getPracticeChatAccess(member) {
   });
 
   if (hasAllowedPlan) {
-    return { allowed: true, type: "paid", trialEnd: null };
-  }
-
-  if (["active", "paid", "premium", "subscribed", "success"].includes(practiceChatStatus) ||
-      ["active", "paid", "premium", "subscribed", "success"].includes(lastPaymentStatus)) {
-    return { allowed: true, type: "paid", trialEnd: null };
-  }
-
-  if (
-    cancelledAt ||
-    ["cancelled", "canceled", "failed", "payment failed", "expired", "inactive", "unsubscribed"].includes(practiceChatStatus) ||
-    ["cancelled", "canceled", "failed", "payment failed", "expired", "inactive", "unsubscribed"].includes(lastPaymentStatus)
-  ) {
-    return { allowed: false, type: practiceChatStatus || lastPaymentStatus || "expired", trialEnd: null };
-  }
-
-  const explicitTrialStart = parseDate(firstValue(fields, [
-    "trialStart",
-    "trial-start",
-    "trial_start"
-  ]));
-  const explicitTrialEnd = parseDate(firstValue(fields, [
-    "trialEnd",
-    "trial-end",
-    "trial_end"
-  ]));
-
-  if (explicitTrialStart || explicitTrialEnd) {
-    const trialEnd = explicitTrialEnd ||
-      (explicitTrialStart ? explicitTrialStart + trialDays * 86400000 : null);
-
-    if (trialEnd && now < trialEnd) {
+    const trialEnd = parseDate(firstValue(fields, ["trialEnd", "trial-end", "trial_end"]));
+    if (trialEnd && Date.now() < trialEnd) {
       return { allowed: true, type: "trial", trialEnd };
     }
-  }
-
-  // Temporary compatibility with the old custom field. Remove after plan IDs are configured.
-  const legacyPlan = String(fields.plan || "").trim().toLowerCase();
-  if (["paid", "premium", "active", "practice chat"].includes(legacyPlan)) {
     return { allowed: true, type: "paid", trialEnd: null };
   }
-
-  const trialStart = parseDate(member.createdAt);
-
-  if (trialStart) {
-    const trialEnd = trialStart + trialDays * 86400000;
-    if (now < trialEnd) {
-      return { allowed: true, type: "trial", trialEnd };
-    }
-  }
-
   return { allowed: false, type: "expired", trialEnd: null };
 }
 
@@ -556,3 +474,5 @@ class HttpError extends Error {
     this.details = details;
   }
 }
+
+module.exports._test = { getPracticeChatAccess };
