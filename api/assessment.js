@@ -8,6 +8,7 @@ const LEVELS = new Set([
   "Не знаю"
 ]);
 const AVAILABILITY = new Set(["Ранок", "День", "Вечір", "У будь-який час"]);
+const { persistAssessmentEligibility } = require("./_trial-booking-shared");
 
 module.exports = async function handler(req, res) {
   setCors(req, res);
@@ -42,6 +43,7 @@ module.exports = async function handler(req, res) {
       submittedAt: new Date().toISOString()
     };
 
+    await persistAssessmentEligibility(payload);
     await deliver(payload);
     return res.status(200).json({ ok: true, submissionId: submission.submissionId });
   } catch (error) {
