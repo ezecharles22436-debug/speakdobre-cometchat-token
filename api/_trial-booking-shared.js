@@ -256,7 +256,7 @@ async function createOrUpdateBooking(authenticated, validated, now = new Date())
 
   const startAt = validated.startAt.toISOString();
   const endAt = new Date(validated.startAt.getTime() + 30 * 60_000).toISOString();
-  const leadMinutes = positiveInteger(process.env.TRIAL_REMINDER_LEAD_MINUTES, 75);
+  const leadMinutes = positiveInteger(process.env.TRIAL_REMINDER_LEAD_MINUTES, 120);
   const reminderDueAt = new Date(validated.startAt.getTime() - leadMinutes * 60_000).toISOString();
   const summary = memberSummary(member);
   const bookingId = current?.bookingId || crypto.randomUUID();
