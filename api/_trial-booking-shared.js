@@ -250,7 +250,7 @@ async function createOrUpdateBooking(authenticated, validated, now = new Date())
     throw new HttpError(404, "No scheduled trial lesson was found.", "BOOKING_NOT_FOUND");
   }
   const eligibility = await loadEligibility(email);
-  if (!eligibility || eligibility.status !== "eligible") {
+  if (!hasBookingEligibility(validated.action, eligibility, current, memberId)) {
     throw new HttpError(403, "Complete the assessment using this account email before booking.", "ASSESSMENT_REQUIRED");
   }
 
@@ -294,6 +294,15 @@ async function createOrUpdateBooking(authenticated, validated, now = new Date())
     console.warn("Trial booking notification queued for retry:", safeError(error));
   }
   return { booking: publicBooking(fields), notificationsPending };
+}
+
+function hasBookingEligibility(action, eligibility, current, memberId) {
+  if (eligibility?.status === "eligible") return true;
+  return action === "reschedule"
+    && eligibility?.status === "booked"
+    && current?.status === "scheduled"
+    && eligibility.bookedMemberId === memberId
+    && eligibility.bookingId === current.bookingId;
 }
 
 async function cancelBooking(authenticated, now = new Date()) {
@@ -568,6 +577,7 @@ module.exports = {
   collectionName,
   createDocument,
   createOrUpdateBooking,
+  hasBookingEligibility,
   eventPayload,
   formatKyiv,
   getBookingForMember,

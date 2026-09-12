@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   generateAvailableSlots,
+  hasBookingEligibility,
   collectionName,
   publicBooking,
   validateBookingInput,
@@ -31,6 +32,20 @@ test("isolates preview Firestore collections with a validated namespace", () => 
   assert.equal(collectionName("trialBookings"), "preview_trial_booking_trialBookings");
   process.env.TRIAL_BOOKING_DATA_NAMESPACE = "../unsafe";
   assert.throws(() => collectionName("trialBookings"), /Invalid TRIAL_BOOKING_DATA_NAMESPACE/);
+});
+
+test("allows only the matching booked member to reschedule", () => {
+  const current = { status: "scheduled", bookingId: "booking-1" };
+  const booked = { status: "booked", bookedMemberId: "member-1", bookingId: "booking-1" };
+
+  assert.equal(hasBookingEligibility("reschedule", booked, current, "member-1"), true);
+  assert.equal(hasBookingEligibility("schedule", booked, current, "member-1"), false);
+  assert.equal(hasBookingEligibility("reschedule", booked, current, "member-2"), false);
+  assert.equal(
+    hasBookingEligibility("reschedule", { ...booked, bookingId: "booking-2" }, current, "member-1"),
+    false
+  );
+  assert.equal(hasBookingEligibility("reschedule", { status: "eligible" }, current, "member-1"), true);
 });
 
 test("accepts a 30-minute slot during the Kyiv booking window", () => {
