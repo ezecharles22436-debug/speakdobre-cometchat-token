@@ -8,6 +8,7 @@ const {
   validateBookingInput,
   zonedParts
 } = require("../api/_trial-booking-shared");
+const { isReminderDue } = require("../api/trial-booking-reminders");
 
 const NOW = new Date("2026-09-12T00:00:00.000Z");
 
@@ -46,6 +47,21 @@ test("allows only the matching booked member to reschedule", () => {
     false
   );
   assert.equal(hasBookingEligibility("reschedule", { status: "eligible" }, current, "member-1"), true);
+});
+
+test("sends a due reminder only once and never for cancelled bookings", () => {
+  const now = Date.parse("2026-09-12T12:00:00.000Z");
+  const due = {
+    status: "scheduled",
+    reminderStatus: "pending",
+    reminderDueAt: "2026-09-12T11:59:00.000Z",
+    startAt: "2026-09-12T12:30:00.000Z"
+  };
+  assert.equal(isReminderDue(due, now), true);
+  assert.equal(isReminderDue({ ...due, reminderStatus: "sent" }, now), false);
+  assert.equal(isReminderDue({ ...due, status: "cancelled" }, now), false);
+  assert.equal(isReminderDue({ ...due, reminderDueAt: "2026-09-12T12:01:00.000Z" }, now), false);
+  assert.equal(isReminderDue({ ...due, startAt: "2026-09-12T12:00:00.000Z" }, now), false);
 });
 
 test("accepts a 30-minute slot during the Kyiv booking window", () => {

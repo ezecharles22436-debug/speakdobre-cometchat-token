@@ -477,6 +477,23 @@ async function createDocument(collectionPath, documentId, fields) {
   return decodeDocument(payload);
 }
 
+async function deleteDocument(path, options = {}) {
+  const token = await googleAccessToken();
+  const project = encodeURIComponent(process.env.FIREBASE_PROJECT_ID);
+  const base = `${FIRESTORE_BASE_URL}/projects/${project}/databases/(default)/documents/${path.split("/").map(encodeURIComponent).join("/")}`;
+  const params = new URLSearchParams();
+  if (options.updateTime) params.set("currentDocument.updateTime", options.updateTime);
+  const response = await fetch(params.size ? `${base}?${params}` : base, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(8000)
+  });
+  if (response.status === 409 || response.status === 412) {
+    throw new HttpError(409, "The booking changed while this request was being processed. Refresh and try again.", "BOOKING_CONFLICT");
+  }
+  if (!response.ok) throw new Error(`Firestore delete failed with status ${response.status}.`);
+}
+
 async function googleAccessToken() {
   if (cachedGoogleToken && cachedGoogleToken.expiresAt > Date.now() + 60_000) return cachedGoogleToken.token;
   const now = Math.floor(Date.now() / 1000);
@@ -577,10 +594,12 @@ module.exports = {
   collectionName,
   createDocument,
   createOrUpdateBooking,
+  deleteDocument,
   hasBookingEligibility,
   eventPayload,
   formatKyiv,
   getBookingForMember,
+  getDocument,
   generateAvailableSlots,
   getMemberstackMember,
   listBookings,
