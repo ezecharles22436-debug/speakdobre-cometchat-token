@@ -28,7 +28,6 @@ test("booking endpoint fails closed while the feature is disabled", async () => 
     else process.env.TRIAL_BOOKING_ENABLED = previous;
   }
 });
-
 test("reminder endpoint requires a timing-safe cron secret", async () => {
   const previousEnabled = process.env.TRIAL_BOOKING_ENABLED;
   const previousSecret = process.env.CRON_SECRET;
