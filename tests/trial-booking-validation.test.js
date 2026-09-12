@@ -4,6 +4,7 @@ const {
   generateAvailableSlots,
   hasBookingEligibility,
   collectionName,
+  eventPayload,
   publicBooking,
   validateBookingInput,
   zonedParts
@@ -47,6 +48,36 @@ test("allows only the matching booked member to reschedule", () => {
     false
   );
   assert.equal(hasBookingEligibility("reschedule", { status: "eligible" }, current, "member-1"), true);
+});
+
+test("provides deterministic Ukrainian transactional email content for every booking event", () => {
+  const booking = {
+    bookingId: "booking-1",
+    eventVersion: 2,
+    memberId: "member-1",
+    assessmentSubmissionId: "assessment-1",
+    studentName: "Тестовий студент",
+    studentEmail: "student@example.test",
+    studentPhone: "+380000000000",
+    startAt: "2026-09-14T06:00:00.000Z",
+    endAt: "2026-09-14T06:30:00.000Z",
+    timeZone: "Europe/Kyiv",
+    durationMinutes: 30,
+    meetingMethod: "google-meet",
+    contactChannel: "email",
+    contactValue: "",
+    reminderDueAt: "2026-09-14T04:00:00.000Z"
+  };
+  for (const event of ["trial-booking-created", "trial-booking-rescheduled", "trial-booking-cancelled", "trial-booking-reminder"]) {
+    const payload = eventPayload(event, booking);
+    assert.match(payload.studentSubject, /SpeakDobre/);
+    assert.match(payload.studentBody, /безкоштовн/i);
+    assert.match(payload.studentBody, /30 хвилин/);
+    assert.match(payload.studentBody, /Керувати бронюванням/);
+    assert.match(payload.staffBody, /Booking ID: booking-1/);
+    assert.equal(payload.notifyStaff, event !== "trial-booking-reminder");
+    assert.equal(payload.idempotencyKey, `booking-1:${event}:2`);
+  }
 });
 
 test("sends a due reminder only once and never for cancelled bookings", () => {

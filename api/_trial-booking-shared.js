@@ -352,7 +352,7 @@ async function cancelBooking(authenticated, now = new Date()) {
 }
 
 function eventPayload(event, booking) {
-  return {
+  const payload = {
     event,
     idempotencyKey: `${booking.bookingId}:${event}:${booking.eventVersion}`,
     bookingId: booking.bookingId,
@@ -372,6 +372,71 @@ function eventPayload(event, booking) {
     reminderDueAt: booking.reminderDueAt,
     manageUrl: "https://www.speakdobre.com/profile?section=trial-lesson"
   };
+  return { ...payload, ...transactionalEmailContent(event, payload) };
+}
+
+function transactionalEmailContent(event, booking) {
+  const meetingLabels = {
+    "google-meet": "Google Meet",
+    zoom: "Zoom",
+    skype: "Skype",
+    other: "Інша платформа"
+  };
+  const contactLabels = {
+    email: "Електронна пошта",
+    telegram: "Telegram",
+    whatsapp: "WhatsApp",
+    viber: "Viber",
+    skype: "Skype",
+    other: "Інший спосіб"
+  };
+  const meeting = meetingLabels[booking.meetingMethod] || booking.meetingMethod;
+  const contact = contactLabels[booking.contactChannel] || booking.contactChannel;
+  const common = [
+    `Дата й час за Києвом: ${booking.startKyiv}`,
+    `Тривалість: ${booking.durationMinutes} хвилин`,
+    "Вартість: 0 ₴ (безкоштовно)",
+    `Бажана платформа: ${meeting}`,
+    `Спосіб зв’язку: ${contact}`
+  ];
+  if (booking.contactValue) common.push(`Контакт: ${booking.contactValue}`);
+
+  let studentSubject;
+  let studentIntro;
+  if (event === "trial-booking-created") {
+    studentSubject = `Ваш безкоштовний пробний урок SpeakDobre заброньовано — ${booking.startKyiv}`;
+    studentIntro = "Вітаємо! Ваш безкоштовний пробний урок успішно заброньовано.";
+  } else if (event === "trial-booking-rescheduled") {
+    studentSubject = `Час пробного уроку SpeakDobre змінено — ${booking.startKyiv}`;
+    studentIntro = "Час вашого безкоштовного пробного уроку успішно змінено.";
+  } else if (event === "trial-booking-cancelled") {
+    studentSubject = "Пробний урок SpeakDobre скасовано";
+    studentIntro = "Ваш безкоштовний пробний урок скасовано. За потреби ви можете обрати новий час у профілі.";
+  } else {
+    studentSubject = "Нагадування: пробний урок SpeakDobre приблизно за годину";
+    studentIntro = "Нагадуємо про ваш безкоштовний пробний урок SpeakDobre.";
+  }
+
+  const studentBody = [
+    studentIntro,
+    "",
+    ...common,
+    "",
+    `Керувати бронюванням: ${booking.manageUrl}`,
+    "Викладача та посилання на зустріч ми повідомимо окремо. Якщо посилання ще не надійшло, дайте відповідь на цей лист.",
+    "",
+    "Команда SpeakDobre"
+  ].join("\n");
+  const staffSubject = `[SpeakDobre] ${event} — ${booking.startKyiv}`;
+  const staffBody = [
+    `Подія: ${event}`,
+    `Студент: ${booking.studentName}`,
+    `Email: ${booking.studentEmail}`,
+    `Телефон: ${booking.studentPhone || "не вказано"}`,
+    ...common,
+    `Booking ID: ${booking.bookingId}`
+  ].join("\n");
+  return { studentSubject, studentBody, staffSubject, staffBody, notifyStaff: event !== "trial-booking-reminder" };
 }
 
 async function sendBookingEvent(payload) {
