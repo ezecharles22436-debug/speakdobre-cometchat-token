@@ -22,11 +22,20 @@ module.exports = async function handler(req, res) {
       throw new HttpError(401, "Authentication required.", "AUTH_REQUIRED");
     }
 
-    const now = Date.now();
     const bookings = await listBookings();
-    let remindersSent = 0;
-    let notificationsRetried = 0;
-    for (const booking of bookings) {
+    const result = await processBookings(bookings);
+    return res.status(200).json({ ok: true, scanned: bookings.length, ...result });
+  } catch (error) {
+    console.error("Trial booking reminder endpoint failed:", safeError(error));
+    if (error instanceof HttpError) return res.status(error.status).json({ error: error.publicMessage, code: error.code });
+    return res.status(500).json({ error: "Unable to process trial reminders." });
+  }
+};
+
+async function processBookings(bookings, now = Date.now()) {
+  let remindersSent = 0;
+  let notificationsRetried = 0;
+  for (const booking of bookings) {
       const path = booking._documentName.split("/documents/")[1];
       if (!path) continue;
 
@@ -55,21 +64,18 @@ module.exports = async function handler(req, res) {
         continue;
       }
 
-      const due = Date.parse(booking.reminderDueAt || "");
-      const starts = Date.parse(booking.startAt || "");
       const reminderAttempt = Date.parse(booking.reminderAttemptAt || "");
       const reminderLeaseExpired = booking.reminderStatus === "sending" && (!Number.isFinite(reminderAttempt) || now - reminderAttempt > 10 * 60_000);
-      if (booking.status !== "scheduled" || !(booking.reminderStatus === "pending" || reminderLeaseExpired) || !Number.isFinite(due) || !Number.isFinite(starts)) continue;
-      if (now < due || now >= starts) continue;
+      if (!isReminderDue(booking, now, reminderLeaseExpired)) continue;
       try {
         await patchDocument(path, {
           reminderStatus: "sending",
-          reminderAttemptAt: new Date().toISOString()
+          reminderAttemptAt: new Date(now).toISOString()
         }, { updateTime: booking._updateTime });
         await sendBookingEvent(eventPayload("trial-booking-reminder", booking));
         await patchDocument(path, {
           reminderStatus: "sent",
-          reminderSentAt: new Date().toISOString()
+          reminderSentAt: new Date(now).toISOString()
         });
         remindersSent++;
       } catch (error) {
@@ -78,14 +84,23 @@ module.exports = async function handler(req, res) {
           try { await patchDocument(path, { reminderStatus: "pending" }); } catch {}
         }
       }
-    }
-    return res.status(200).json({ ok: true, scanned: bookings.length, remindersSent, notificationsRetried });
-  } catch (error) {
-    console.error("Trial booking reminder endpoint failed:", safeError(error));
-    if (error instanceof HttpError) return res.status(error.status).json({ error: error.publicMessage, code: error.code });
-    return res.status(500).json({ error: "Unable to process trial reminders." });
   }
-};
+  return { remindersSent, notificationsRetried };
+}
+
+function isReminderDue(booking, now = Date.now(), leaseExpired = false) {
+  const due = Date.parse(booking.reminderDueAt || "");
+  const starts = Date.parse(booking.startAt || "");
+  return booking.status === "scheduled"
+    && (booking.reminderStatus === "pending" || leaseExpired)
+    && Number.isFinite(due)
+    && Number.isFinite(starts)
+    && now >= due
+    && now < starts;
+}
+
+module.exports.processBookings = processBookings;
+module.exports.isReminderDue = isReminderDue;
 
 function timingSafeEqual(left, right) {
   const crypto = require("node:crypto");
