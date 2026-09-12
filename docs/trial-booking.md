@@ -12,7 +12,7 @@ This feature adds one account-bound, private trial-lesson booking per Memberstac
 - No teacher is assigned or disclosed by this service.
 - One member may have only one scheduled trial at a time.
 - The minimum notice is 120 minutes by default.
-- The reminder is due 75 minutes before the lesson by default. A fifteen-minute Zapier schedule therefore normally delivers it 60–75 minutes before the lesson.
+- The reminder is due 120 minutes before the lesson by default. An hourly Zapier schedule therefore normally delivers it 60–120 minutes before the lesson.
 - Email is the guaranteed fallback. Messenger delivery is not promised until an official channel integration exists.
 
 ## Required environment variables
@@ -29,7 +29,7 @@ This feature adds one account-bound, private trial-lesson booking per Memberstac
 | `ZAPIER_TRIAL_BOOKING_WEBHOOK_URL` | Private Catch Hook for transactional booking events. |
 | `CRON_SECRET` | Bearer secret used by the reminder endpoint. |
 
-Optional: `TRIAL_BOOKING_MIN_NOTICE_MINUTES` (default `120`) and `TRIAL_REMINDER_LEAD_MINUTES` (default `75`).
+Optional: `TRIAL_BOOKING_MIN_NOTICE_MINUTES` (default `120`) and `TRIAL_REMINDER_LEAD_MINUTES` (default `120`).
 
 For isolated Preview testing, set `TRIAL_BOOKING_DATA_NAMESPACE=preview_trial_booking` (or another short environment-specific value). This prefixes both Firestore collections so synthetic Preview records cannot overlap production records. Leave it empty in Production.
 
@@ -65,7 +65,7 @@ Use `idempotencyKey` as the Zap's deduplication key before any email or staff no
 
 The API uses a short sending lease to stop concurrent scheduler runs from intentionally duplicating delivery. A provider-side idempotency check is still required because a process can stop after Zapier accepts an event but before Firestore records success.
 
-Because the connected Vercel project is on Hobby, reminders are not scheduled with Vercel Cron. Configure a separate `Schedule by Zapier` trigger every 15 minutes, followed by `Webhooks by Zapier` calling `POST /api/trial-booking-reminders` with `Authorization: Bearer {CRON_SECRET}`. The endpoint scans only the namespace selected by `TRIAL_BOOKING_DATA_NAMESPACE`.
+Because the connected Vercel project is on Hobby, reminders are not scheduled with Vercel Cron. Configure a separate `Schedule by Zapier` trigger every hour, followed by `Webhooks by Zapier` calling `POST /api/trial-booking-reminders` with `Authorization: Bearer {CRON_SECRET}`. The endpoint scans only the namespace selected by `TRIAL_BOOKING_DATA_NAMESPACE`.
 
 ## Manual assessment reply
 
