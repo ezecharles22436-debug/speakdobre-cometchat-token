@@ -646,6 +646,7 @@ module.exports = {
   eventPayload,
   formatKyiv,
   getBookingForMember,
+  getDocument,
   generateAvailableSlots,
   getMemberstackMember,
   listBookings,

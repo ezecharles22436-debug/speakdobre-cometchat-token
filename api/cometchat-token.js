@@ -484,3 +484,4 @@ class HttpError extends Error {
 }
 
 module.exports._test = { getPracticeChatAccess };
+module.exports.getPracticeChatAccess = getPracticeChatAccess;
