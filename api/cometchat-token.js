@@ -49,6 +49,7 @@ module.exports = async function handler(req, res) {
     const uid = member.id;
 
     await ensureCometChatUser(uid, name);
+    await reactivateCometChatUser(uid);
     const token = await createCometChatToken(uid);
     const rooms = await getVisibleRoomsForUser(uid);
 
@@ -243,6 +244,13 @@ async function createCometChatToken(uid) {
     throw new Error("CometChat did not return an auth token.");
   }
   return token;
+}
+
+async function reactivateCometChatUser(uid) {
+  await cometChatRequest("/users", {
+    method: "PUT",
+    body: { uidsToActivate: [uid] }
+  });
 }
 
 async function getVisibleRoomsForUser(uid) {
