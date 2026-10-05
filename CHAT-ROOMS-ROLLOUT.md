@@ -11,7 +11,12 @@
 - Provider response failures fail closed; per-user addition results are checked.
 - UI prototype: workspace `outputs/speakdobre-group-selection-preview.html` (not connected to this endpoint yet).
 
-## Preview configuration (not yet applied)
+## Preview configuration
+
+Applied to isolated branch `codex/practice-chat-room-selection`: Preview Firebase credentials,
+Memberstack Test Mode credentials, isolated CometChat app `168437005e7f6fa2a`,
+namespace `preview_room_selection`, and staging-only allowed origin. Both enable flags
+remain false. Production is unchanged.
 
 - `CHAT_ROOMS_ENABLED=true` only after permission verification below.
 - `CHAT_ROOMS_PERMISSIONS_VERIFIED=true` only after real SDK negative tests pass.
@@ -53,6 +58,35 @@ Access-revocation integration must prevent/clean membership additions racing wit
 Default token flow is unchanged so deployed behavior is unchanged while feature remains off.
 No automatic self-repair of uncertain locks is implemented; safety takes precedence over availability.
 No production release is ready yet.
+
+## Verified checkpoint, 2026-10-06
+
+- Isolated student role saved and reload-verified: directory listing and standalone
+  user details restricted to moderator/super_moderator; direct and threaded message
+  recipients restricted to those roles; call initiation denied. Previously saved
+  direct group creation/join denial retained.
+- These are dashboard configuration checks, NOT user-token enforcement tests.
+- Local token endpoint now resolves staff only from trusted server ID allowlists,
+  verifies provider role assignment before token creation, and permits staff access
+  without a paid student plan only when both rollout flags are enabled.
+- Provider 400/403 failures no longer count as nonexistent users/memberships.
+- Local full suite: 60 passed, 0 failed. Added five role/token regression tests.
+- These latest local token changes have not been pushed or deployed.
+- Remaining: actual SDK negative tests, moderator group scopes, staff membership
+  provisioning, selector/bootstrap integration, and revocation race handling.
+
+## Frontend checkpoint
+
+- Added `public/chat-room-selector.js`: Ukrainian accessible form; one level plus
+  up to two topics; fresh Memberstack bearer for each request; confirmed POST then
+  GET before proceeding; no automatic POST retry after uncertain outcomes.
+- Added `public/chat-room-bootstrap.js`: students wait for confirmed selection;
+  trusted staff skip student selection; fresh token/entitlement check before opening
+  chat; identity changes during selection fail closed; duplicate starts prevented.
+- Full local suite: 68 tests passed. Client and bootstrap tests are mocked, not
+  browser or CometChat SDK tests.
+- These frontend modules are not yet wired into the Webflow embed, deployed, or
+  visually tested. The old live group-assignment message remains unchanged.
 
 ## Documentation used
 

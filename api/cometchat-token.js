@@ -1,4 +1,16 @@
 const MEMBERSTACK_BASE_URL = "https://admin.memberstack.com";
+const { roleForMember } = require('./_chat-room-policy');
+
+function roomRoleForMember(memberId, env = process.env) {
+  if (env.CHAT_ROOMS_ENABLED !== 'true') return null;
+  if (env.CHAT_ROOMS_PERMISSIONS_VERIFIED !== 'true') {
+    throw new HttpError(503, 'Practice Chat permissions are not ready.');
+  }
+  return roleForMember(memberId, {
+    superModeratorIds: [...csvSet(env.CHAT_SUPER_MODERATOR_IDS)],
+    moderatorIds: [...csvSet(env.CHAT_MODERATOR_IDS)]
+  });
+}
 
 module.exports = async function handler(req, res) {
   setCors(req, res);
@@ -33,7 +45,10 @@ module.exports = async function handler(req, res) {
       return res.status(401).json({ error: "Member not found." });
     }
 
-    const access = getPracticeChatAccess(member);
+    const role = roomRoleForMember(memberId);
+    const access = role && role !== 'student'
+      ? { allowed: true, type: 'staff', trialEnd: null }
+      : getPracticeChatAccess(member);
     if (!access.allowed) {
       return res.status(403).json({
         error: "Practice Chat access has expired.",
@@ -48,7 +63,7 @@ module.exports = async function handler(req, res) {
     const name = cleanText(`${firstName} ${lastName}`.trim() || email || "SpeakDobre Member", 100);
     const uid = member.id;
 
-    await ensureCometChatUser(uid, name);
+    await ensureCometChatUser(uid, name, role);
     await reactivateCometChatUser(uid);
     const token = await createCometChatToken(uid);
     const rooms = await getVisibleRoomsForUser(uid);
@@ -58,7 +73,8 @@ module.exports = async function handler(req, res) {
       token,
       user: {
         uid,
-        name
+        name,
+        ...(role ? { role } : {})
       },
       rooms,
       access: {
@@ -215,18 +231,32 @@ function firstValue(source, keys) {
   return "";
 }
 
-async function ensureCometChatUser(uid, name) {
+async function ensureCometChatUser(uid, name, role = null) {
   const existing = await cometChatRequest(`/users/${encodeURIComponent(uid)}`, {
     method: "GET",
     allowNotFound: true
   });
 
-  if (existing) return;
+  if (existing) {
+    // Never trust a client-editable Memberstack field or a prior provider role.
+    if (role) {
+      const updated = await cometChatRequest(`/users/${encodeURIComponent(uid)}`, {
+        method: 'PUT', body: { role }
+      });
+      if ((updated?.data || updated)?.role !== role) {
+        throw new HttpError(503, 'Unable to verify Practice Chat role.');
+      }
+    }
+    return;
+  }
 
-  await cometChatRequest("/users", {
+  const created = await cometChatRequest("/users", {
     method: "POST",
-    body: { uid, name }
+    body: { uid, name, ...(role ? { role } : {}) }
   });
+  if (role && (created?.data || created)?.role !== role) {
+    throw new HttpError(503, 'Unable to verify Practice Chat role.');
+  }
 }
 
 async function createCometChatToken(uid) {
@@ -411,7 +441,7 @@ async function cometChatRequest(path, options = {}) {
     body: options.body === undefined ? undefined : JSON.stringify(options.body)
   });
 
-  if ([400, 403, 404].includes(response.status) && options.allowNotFound) return null;
+  if (response.status === 404 && options.allowNotFound) return null;
 
   const payload = await readJson(response);
   if (!response.ok) {
@@ -483,5 +513,5 @@ class HttpError extends Error {
   }
 }
 
-module.exports._test = { getPracticeChatAccess };
+module.exports._test = { getPracticeChatAccess, roomRoleForMember, ensureCometChatUser };
 module.exports.getPracticeChatAccess = getPracticeChatAccess;
