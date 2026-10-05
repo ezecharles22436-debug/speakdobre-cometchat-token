@@ -27,9 +27,9 @@ function createHandler(env=process.env,fetcher=fetch) {
     const allowedOrigins = new Set(['https://speakdobre-cometchat-git-db9a07-ezecharles22436-4127s-projects.vercel.app',
       ...(env.VERCEL_URL ? [`https://${env.VERCEL_URL}`] : [])]);
     if(origin && !allowedOrigins.has(origin))return res.status(403).send('Origin rejected: '+String(origin).replace(/[^A-Za-z0-9:./_-]/g,'')+'; host: '+String(req.headers.host).replace(/[^A-Za-z0-9:./_-]/g,''));
-    const api=async(path,method='GET',payload)=>{
+    const api=async(path,method='GET',payload,onBehalfOf)=>{
       const response=await fetcher(`https://${APP}.api-eu.cometchat.io/v3${path}`,{
-        method,headers:{apikey:env.COMETCHAT_API_KEY,'Content-Type':'application/json'},
+        method,headers:{apikey:env.COMETCHAT_API_KEY,'Content-Type':'application/json',...(onBehalfOf?{onBehalfOf}:{})},
         body:payload===undefined?undefined:JSON.stringify(payload),signal:AbortSignal.timeout(10000)});
       const value=await response.json().catch(()=>({}));
       if(!response.ok)throw Object.assign(new Error('Provider operation failed'),{status:response.status,code:value.error?.code});
@@ -60,7 +60,8 @@ function createHandler(env=process.env,fetcher=fetch) {
       // Existing membership can return per-user already-member errors; SDK checks
       // verify actual resulting permissions instead of treating HTTP 200 as proof.
       await api(`/groups/${PRIVATE}/scopes/moderator/permissions`,'PUT',{permissions:{deleteGroup:'deny'}});
-      const data=JSON.stringify({users:USERS,sessions}).replace(/</g,'\\u003c');
+      const historical=await api('/messages','POST',{receiver:USERS.peer,receiverType:'user',category:'message',type:'text',data:{text:'Synthetic historical peer message'}},USERS.student);
+      const data=JSON.stringify({users:USERS,sessions,historicalId:historical.id}).replace(/</g,'\\u003c');
       const secret=JSON.stringify(body.secret).replace(/</g,'\\u003c');
       return res.status(200).send(shell(`<h1>Isolated SDK permission checks</h1><p>Only synthetic Preview accounts and rooms.</p><button id="run">Run checks</button><button id="cleanup">Revoke synthetic sessions</button><pre id="results">Ready</pre><script src="https://unpkg.com/@cometchat/chat-sdk-javascript/CometChat.js"></script><script>
 const data=${data}, output=document.querySelector('#results'), rows=[];
@@ -78,9 +79,20 @@ await check('student cannot create group',false,()=>CometChat.createGroup(new Co
 await check('student directory excludes peers',true,()=>new CometChat.UsersRequestBuilder().setLimit(100).build().fetchNext(),list=>list.every(u=>['moderator','super_moderator'].includes(u.getRole())));
 await check('student cannot inspect peer profile',false,()=>CometChat.getUser(data.users.peer));
 await check('student can read group member identities',true,()=>new CometChat.GroupMembersRequestBuilder('${PRIVATE}').setLimit(100).build().fetchNext());
+await check('student cannot promote self to group admin',false,()=>CometChat.updateGroupMemberScope('${PRIVATE}',data.users.student,CometChat.GROUP_MEMBER_SCOPE.ADMIN));
+await check('student cannot kick another member',false,()=>CometChat.kickGroupMember('${PRIVATE}',data.users.peer));
+await check('student cannot reply to historical peer DM thread',false,()=>{const m=new CometChat.TextMessage(data.users.peer,'Synthetic blocked thread reply','user');m.setParentMessageId(Number(data.historicalId));return CometChat.sendMessage(m);});
+await check('historical peer DM is inaccessible',false,()=>new CometChat.MessagesRequestBuilder().setUID(data.users.peer).setLimit(10).build().fetchPrevious());
+await check('student cannot initiate peer call',false,async()=>{const c=await CometChat.initiateCall(new CometChat.Call(data.users.peer,CometChat.CALL_TYPE.AUDIO,CometChat.RECEIVER_TYPE.USER));await CometChat.rejectCall(c.getSessionId(),CometChat.CALL_STATUS.CANCELLED);return c;});
+await check('student can reply in group thread',true,async()=>{const parent=await msg('${PRIVATE}','group');const m=new CometChat.TextMessage('${PRIVATE}','Synthetic group thread reply','group');m.setParentMessageId(parent.getId());return CometChat.sendMessage(m);});
 await CometChat.logout();await CometChat.login(data.sessions.moderator);
 await check('moderator can message student',true,()=>msg(data.users.student));
 await check('moderator cannot delete group',false,()=>CometChat.deleteGroup('${PRIVATE}'));
+await check('moderator cannot promote self to admin',false,()=>CometChat.updateGroupMemberScope('${PRIVATE}',data.users.moderator,CometChat.GROUP_MEMBER_SCOPE.ADMIN));
+await check('moderator can initiate then cancel student call',true,async()=>{const c=await CometChat.initiateCall(new CometChat.Call(data.users.student,CometChat.CALL_TYPE.AUDIO,CometChat.RECEIVER_TYPE.USER));await CometChat.rejectCall(c.getSessionId(),CometChat.CALL_STATUS.CANCELLED);return c;});
+await check('moderator can kick a synthetic participant',true,()=>CometChat.kickGroupMember('${PRIVATE}',data.users.peer));
+await CometChat.logout();await CometChat.login(data.sessions.owner);
+await check('owner can delete synthetic public room',true,()=>CometChat.deleteGroup('preview-room-public'));
 await CometChat.logout();output.textContent+='\\nFinished';
 }catch(e){output.textContent+='\\nStopped: '+String(e.code||e.name||'unknown');}};
 document.querySelector('#cleanup').onclick=async function(){this.disabled=true;try{await CometChat.logout();}catch(_){}const response=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({secret:${secret},action:'cleanup'})});output.textContent+=response.ok?'\\nCleanup confirmed':'\\nCleanup failed';};
