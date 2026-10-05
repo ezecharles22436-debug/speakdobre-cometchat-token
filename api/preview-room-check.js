@@ -60,7 +60,12 @@ function createHandler(env=process.env,fetcher=fetch) {
       // Existing membership can return per-user already-member errors; SDK checks
       // verify actual resulting permissions instead of treating HTTP 200 as proof.
       await api(`/groups/${PRIVATE}/scopes/moderator/permissions`,'PUT',{permissions:{deleteGroup:'deny'}});
-      const historical=await api('/messages','POST',{receiver:USERS.peer,receiverType:'user',category:'message',type:'text',data:{text:'Synthetic historical peer message'}},USERS.student);
+      let historical;
+      // Synthetic account only: create a pre-restriction fixture, restoring its
+      // restrictive role even if seeding fails. Never alter the shared role.
+      await api(`/users/${USERS.student}`,'PUT',{role:'default'});
+      try { historical=await api('/messages','POST',{receiver:USERS.peer,receiverType:'user',category:'message',type:'text',data:{text:'Synthetic historical peer message'}},USERS.student); }
+      finally { await api(`/users/${USERS.student}`,'PUT',{role:'student'}); }
       const data=JSON.stringify({users:USERS,sessions,historicalId:historical.id}).replace(/</g,'\\u003c');
       const secret=JSON.stringify(body.secret).replace(/</g,'\\u003c');
       return res.status(200).send(shell(`<h1>Isolated SDK permission checks</h1><p>Only synthetic Preview accounts and rooms.</p><button id="run">Run checks</button><button id="cleanup">Revoke synthetic sessions</button><pre id="results">Ready</pre><script src="https://unpkg.com/@cometchat/chat-sdk-javascript/CometChat.js"></script><script>
