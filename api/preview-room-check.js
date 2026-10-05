@@ -26,7 +26,7 @@ function createHandler(env=process.env,fetcher=fetch) {
     const origin=req.headers.origin;
     const allowedOrigins = new Set(['https://speakdobre-cometchat-git-db9a07-ezecharles22436-4127s-projects.vercel.app',
       ...(env.VERCEL_URL ? [`https://${env.VERCEL_URL}`] : [])]);
-    if(origin && !allowedOrigins.has(origin))return res.status(403).send('Origin rejected');
+    if(origin && !allowedOrigins.has(origin))return res.status(403).send('Origin rejected: '+String(origin).replace(/[^A-Za-z0-9:./_-]/g,'')+'; host: '+String(req.headers.host).replace(/[^A-Za-z0-9:./_-]/g,''));
     const api=async(path,method='GET',payload)=>{
       const response=await fetcher(`https://${APP}.api-eu.cometchat.io/v3${path}`,{
         method,headers:{apikey:env.COMETCHAT_API_KEY,'Content-Type':'application/json'},
