@@ -10,12 +10,14 @@ module.exports = async function handler(req, res) {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ ok: false, error: "Method not allowed." });
   }
-  if (!secretsMatch(readBearerToken(req.headers.authorization), process.env.PREVIEW_LIFECYCLE_RUNNER_SECRET)) {
+  const body = readBody(req.body);
+  const suppliedSecret = readBearerToken(req.headers.authorization) || String(body.secret || "");
+  if (!secretsMatch(suppliedSecret, process.env.PREVIEW_LIFECYCLE_RUNNER_SECRET)) {
     return res.status(401).json({ ok: false, error: "Unauthorized." });
   }
 
-  const uid = cleanUid(req.body?.uid);
-  const action = String(req.body?.action || "").trim().toLowerCase();
+  const uid = cleanUid(body.uid);
+  const action = String(body.action || "").trim().toLowerCase();
   if (!uid || !["status", "reactivate"].includes(action)) {
     return res.status(400).json({ ok: false, error: "Invalid synthetic lifecycle request." });
   }
@@ -44,6 +46,12 @@ module.exports = async function handler(req, res) {
 function readBearerToken(header) {
   if (typeof header !== "string" || !header.startsWith("Bearer ")) return "";
   return header.slice(7).trim();
+}
+
+function readBody(value) {
+  if (value && typeof value === "object") return value;
+  if (typeof value !== "string") return {};
+  return Object.fromEntries(new URLSearchParams(value));
 }
 
 function secretsMatch(supplied, expected) {
@@ -98,4 +106,4 @@ function safeError(error) {
   return { name: error?.name, message: error?.message, status: error?.status };
 }
 
-module.exports._test = { cleanUid, secretsMatch };
+module.exports._test = { cleanUid, secretsMatch, readBody };
