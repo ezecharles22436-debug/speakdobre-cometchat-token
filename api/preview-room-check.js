@@ -15,7 +15,7 @@ function secretMatches(a,b) {
 const shell = content => `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Isolated Practice Chat verification</title><style>body{font:16px system-ui;max-width:1000px;margin:32px auto;padding:20px;background:#f5f7fc;color:#122441}button,input{padding:12px;margin:8px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;padding:20px;border-radius:16px}</style>${content}</html>`;
 function createHandler(env=process.env,fetcher=fetch) {
   return async(req,res)=>{
-    res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');
+    res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');
     if(!permitted(env))return res.status(404).end();
     res.setHeader('Content-Type','text/html; charset=utf-8');
     if(req.method==='GET')return res.status(200).send(shell('<h1>Isolated Practice Chat verification</h1><p>Synthetic accounts only. Production is excluded by server checks.</p><form method="post"><label>Temporary test secret <input name="secret" type="password" autocomplete="off" required></label><input type="hidden" name="action" value="prepare"><button>Prepare SDK checks</button></form>'));
