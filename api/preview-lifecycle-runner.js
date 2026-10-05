@@ -18,11 +18,22 @@ module.exports = async function handler(req, res) {
 
   const uid = cleanUid(body.uid);
   const action = String(body.action || "").trim().toLowerCase();
-  if (!uid || !["status", "reactivate"].includes(action)) {
+  if (!uid || !["ensure", "status", "reactivate"].includes(action)) {
     return res.status(400).json({ ok: false, error: "Invalid synthetic lifecycle request." });
   }
 
   try {
+    if (action === "ensure") {
+      try {
+        await cometChatRequest(`/users/${encodeURIComponent(uid)}`);
+      } catch (error) {
+        if (error?.status !== 404) throw error;
+        await cometChatRequest("/users", {
+          method: "POST",
+          body: { uid, name: "Preview lifecycle synthetic user" }
+        });
+      }
+    }
     if (action === "reactivate") {
       await cometChatRequest("/users", {
         method: "PUT",
