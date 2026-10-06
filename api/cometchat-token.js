@@ -1,6 +1,8 @@
 const MEMBERSTACK_BASE_URL = "https://admin.memberstack.com";
 const { roleForMember } = require('./_chat-room-policy');
 const { roomReleaseReady } = require('./_chat-room-release');
+const { createRoomProvider } = require('./_chat-room-provider');
+const { prepareRoomAccess } = require('./_chat-room-staff');
 
 function roomRoleForMember(memberId, env = process.env) {
   if (env.CHAT_ROOMS_ENABLED !== 'true') return null;
@@ -65,6 +67,7 @@ module.exports = async function handler(req, res) {
     const uid = member.id;
 
     await ensureCometChatUser(uid, name, role);
+    const roomAccess = role ? await prepareRoomAccess({ uid, role, chat: createRoomProvider() }) : null;
     await reactivateCometChatUser(uid);
     const token = await createCometChatToken(uid);
     const rooms = await getVisibleRoomsForUser(uid);
@@ -78,6 +81,7 @@ module.exports = async function handler(req, res) {
         ...(role ? { role } : {})
       },
       rooms,
+      ...(roomAccess ? { staffContacts: roomAccess.contacts } : {}),
       access: {
         type: access.type,
         trialEnd: access.trialEnd ? new Date(access.trialEnd).toISOString() : null
@@ -516,4 +520,3 @@ class HttpError extends Error {
 
 module.exports._test = { getPracticeChatAccess, roomRoleForMember, ensureCometChatUser };
 module.exports.getPracticeChatAccess = getPracticeChatAccess;
-

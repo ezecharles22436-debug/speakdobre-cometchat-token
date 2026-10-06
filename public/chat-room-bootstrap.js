@@ -7,12 +7,13 @@
   // Token responses must come directly from the authenticated server endpoint,
   // never from localStorage or client-editable Memberstack custom fields.
   function createBootstrap({ getSession, showSelector, startChat, hideSelector }) {
-    let started = false, starting = false, identity;
+    let started = false, starting = false, identity, initialRole;
     function check(session) {
       if (!session?.token || !session.user?.uid || !['student', 'moderator', 'super_moderator'].includes(session.user.role)) {
         throw new Error('Не вдалося перевірити доступ до чату.');
       }
       if (identity && session.user.uid !== identity) throw new Error('Акаунт змінився. Оновіть сторінку.');
+      if (initialRole && session.user.role !== initialRole) throw new Error('Права доступу змінилися. Оновіть сторінку.');
       return session;
     }
     async function open() {
@@ -29,6 +30,7 @@
     return async function boot() {
       const session = check(await getSession());
       identity = session.user.uid;
+      initialRole = session.user.role;
       if (session.user.role === 'student') {
         await showSelector({ onReady: open });
       } else {

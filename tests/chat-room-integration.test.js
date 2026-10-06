@@ -50,6 +50,26 @@ test('provider does not interpret permission failure as missing membership', asy
   const provider = createRoomProvider(async () => ({ ok: false, status: 403 }), env);
   await assert.rejects(provider.memberships('mem_test'));
 });
+
+test('staff provider validates nested write successes and prohibits unsupported scope', async () => {
+  const provider = createRoomProvider(async () => ({ok:true,json:async()=>({data:{}})}), env);
+  await assert.rejects(provider.addStaff('school','mem_mod','moderator'));
+  await assert.rejects(provider.addStaff('school','mem_mod','owner'));
+  await assert.rejects(provider.addFriends('mem_student',['mem_mod']));
+  await assert.rejects(provider.user('mem_mod'));
+});
+
+test('staff writes use explicit scope and do not auto-create conversations', async () => {
+  const requests=[];
+  const provider=createRoomProvider(async(url,options)=>{
+    const body=JSON.parse(options.body);requests.push({url,body});
+    return {ok:true,json:async()=>({data:{moderators:{mem_mod:{success:true}},accepted:{mem_mod:{success:true}}}})};
+  },env);
+  await provider.addStaff('school','mem_mod','moderator');
+  await provider.addFriends('mem_student',['mem_mod']);
+  assert.deepEqual(requests[0].body,{moderators:['mem_mod']});
+  assert.deepEqual(requests[1].body,{accepted:['mem_mod'],addToConversations:false});
+});
 function response() {
   return { setHeader() {}, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; }, end() {} };
 }

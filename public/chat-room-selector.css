@@ -25,4 +25,10 @@
 @media(max-width:800px){.sd-room-picker fieldset{grid-template-columns:repeat(2,minmax(0,1fr))}.sd-room-picker fieldset+fieldset{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.sd-room-picker fieldset,.sd-room-picker fieldset+fieldset{grid-template-columns:1fr;padding:14px;gap:10px}.sd-room-choice{padding:16px}.sd-room-actions{display:grid;grid-template-columns:1fr;width:100%}.sd-room-actions button{width:100%}.sd-room-count{margin-bottom:4px}}
 @media(prefers-reduced-motion:reduce){.sd-room-picker *{transition:none!important}}
-
+.sd-chat-room-rail{display:flex;flex-wrap:wrap;gap:10px;padding:16px;background:#f5f7fc;border-bottom:1px solid #dfe6f4}
+.sd-chat-room-rail button{min-height:44px;padding:10px 16px;border:1px solid #d7e1f2;border-radius:14px;background:#fff;color:#132344;font:inherit;cursor:pointer}
+.sd-chat-room-rail button:hover{border-color:#8055dc}
+.sd-chat-room-rail button:focus-visible{outline:3px solid #7952dc;outline-offset:2px}
+.sd-chat-room-rail button:disabled{opacity:.6;cursor:wait}
+.sd-chat-room-rail [role=status]{width:100%;margin:0;font-size:14px;color:#455575}
+.sd-chat-room-rail [role=status]:empty{display:none}

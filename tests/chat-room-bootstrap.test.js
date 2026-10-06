@@ -30,3 +30,10 @@ test('verified staff bypass student picker, unknown roles never open', async () 
   }
   await assert.rejects(createBootstrap({ getSession: async () => session('default') })());
 });
+
+test('role change during room selection requires reload',async()=>{
+  let ready,reads=0;
+  await createBootstrap({getSession:async()=>session(++reads===1?'student':'moderator'),
+    showSelector:async o=>{ready=o.onReady;},startChat:async()=>assert.fail('must not open'),hideSelector(){}})();
+  await assert.rejects(ready(),/Права доступу/);
+});

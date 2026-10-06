@@ -28,6 +28,27 @@ function createRoomProvider(fetcher = fetch, env = process.env) {
     throw new Error('Chat provider pagination limit');
   }
   return {
+    async user(uid) {
+      const payload = await request(`/users/${enc(uid)}`);
+      if (payload.data?.uid !== uid || !payload.data.role) throw new Error('Invalid staff identity response');
+      return payload.data;
+    },
+    async friends(uid) {
+      const rows = await list(`/users/${enc(uid)}/friends`);
+      if (rows.some(row => !row.uid || !row.role)) throw new Error('Invalid friends response');
+      return rows.map(({ uid, role }) => ({ uid, role }));
+    },
+    async addFriends(uid, ids) {
+      if (!ids.length) return;
+      const payload = await request(`/users/${enc(uid)}/friends`, 'POST', { accepted: ids, addToConversations: false });
+      if (ids.some(id => payload.data?.accepted?.[id]?.success !== true)) throw new Error('Staff contacts not confirmed');
+    },
+    async addStaff(guid, uid, scope) {
+      const key = scope === 'admin' ? 'admins' : scope === 'moderator' ? 'moderators' : null;
+      if (!key) throw new Error('Invalid staff scope');
+      const payload = await request(`/groups/${enc(guid)}/members`, 'POST', { [key]: [uid] });
+      if (payload.data?.[key]?.[uid]?.success !== true) throw new Error('Staff membership not confirmed');
+    },
     async memberships(uid) {
       const rows = await list('/groups?hasJoined=true', uid);
       if (rows.some(row => !row.guid || row.hasJoined !== true || !row.scope)) throw new Error('Invalid membership response');
