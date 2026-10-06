@@ -30,10 +30,10 @@ function createFixtureSeeder(api) {
       throw new Error('Fixture identity not confirmed');
     }
     if (parent !== undefined) {
-      if (String(actual.parentMessageId) !== String(parent)) throw new Error('Thread parent not confirmed');
-      const thread = await api('/messages/' + parent + '/thread?perPage=100', 'GET', undefined, sender);
+      if (String(actual.parentId) !== String(parent)) throw new Error('Thread parent not confirmed');
+      const thread = await api('/messages/' + parent + '/thread?limit=100', 'GET', undefined, sender);
       if (!Array.isArray(thread) || !thread.some(m => String(m.id) === String(value.id) &&
-          String(m.parentMessageId) === String(parent))) throw new Error('Thread fixture not readable');
+          String(m.parentId) === String(parent))) throw new Error('Thread fixture not readable');
     }
     fixtures[label] = String(value.id);
     return value.id;
@@ -181,7 +181,7 @@ await CometChat.logout();output.textContent+='\\nFinished';
 }catch(e){output.textContent+='\\nStopped: '+String(e.code||e.name||'unknown');}};
 document.querySelector('#cleanup').onclick=async function(){this.disabled=true;try{await CometChat.logout();}catch(_){}const response=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({secret:${secret},action:'cleanup'})});output.textContent+=response.ok?'\\nCleanup confirmed':'\\nCleanup failed';};
 </script>`));
-    }catch(error){return res.status(502).send(shell('<h1>Preparation stopped</h1><p>'+String(error.code||error.status||'Verification failed').replace(/[^A-Za-z0-9_ -]/g,'')+'</p>'));}
+    }catch(error){const safe = ['Missing fixture ID','Fixture identity not confirmed','Thread parent not confirmed','Thread fixture not readable','Staff contacts not confirmed','Unexpected contacts','Synthetic role mismatch'];return res.status(502).send(shell('<h1>Preparation stopped</h1><p>'+String(error.code||error.status||(safe.includes(error.message)?error.message:'Verification failed')).replace(/[^A-Za-z0-9_ -]/g,'')+'</p>'));}
   };
 }
 module.exports=createHandler();module.exports._test={permitted,secretMatches,createHandler,createFixtureSeeder};
