@@ -7,9 +7,10 @@
   // Presentation only. Provider permissions remain the access-control boundary.
   function stylesForRole(role){
     if(!['student','moderator','super_moderator'].includes(role))throw Error('Невідома роль чату.');
-    return role==='student'
+    const responsive='body>div,.CometChatApp{width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box}';
+    return responsive+(role==='student'
       ? 'button[title="Voice call"],button[title="Video call"],button[title="Голосовий виклик"],button[title="Відеовиклик"]{display:none!important}'
-      : '';
+      : '');
   }
   function mount({container,role}){
     const css=stylesForRole(role),doc=container.ownerDocument;
