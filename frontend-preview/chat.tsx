@@ -7,6 +7,7 @@ import '@cometchat/chat-uikit-react/styles';
 import './chat.css';
 import uk from './uk.json';
 import ukExtra from './uk-extra.json';
+import ukCompat from './uk-compat.json';
 import { createSessionAdapter } from './session-adapter.cjs';
 import { createIncomingCalls } from './incoming-calls.mjs';
 import { createOutgoingCalls } from './outgoing-calls.mjs';
@@ -26,7 +27,8 @@ export async function mountPreviewChat({ container, appId, getSession, authorize
 }) {
   if (appId !== '168437005e7f6fa2a') throw Error('Доступна лише ізольована версія чату.');
   await CometChatUIKit.init(new UIKitSettingsBuilder().setAppId(appId).setRegion('eu').setCallingEnabled(true).build());
-  CometChatLocalize.getSharedInstance().addTranslation({ uk: { ...uk, ...ukExtra } });
+  // Pinned UI Kit composer still requests legacy keys absent from its dictionary.
+  CometChatLocalize.getSharedInstance().addTranslation({ uk: { ...uk, ...ukExtra, ...ukCompat } });
   const doc = container.ownerDocument;
   const messages = doc.createElement('div'), offers = doc.createElement('div'), callSurface = doc.createElement('div'), studentPicker=doc.createElement('div');
   offers.setAttribute('aria-live','polite'); offers.className='sd-incoming-offer';

@@ -5,6 +5,20 @@ const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, 'chat.tsx'), 'utf8');
 const core = require('./uk.json'), extra = require('./uk-extra.json');
 const uk = { ...core, ...extra };
+const compat = require('./uk-compat.json');
+
+test('legacy vendor lookup keys are translated and installed, including edit and loading states', () => {
+  const dir = path.join(__dirname, 'node_modules/@cometchat/chat-uikit-react/dist');
+  const requested = new Set();
+  for (const file of fs.readdirSync(dir).filter(file => file.endsWith('.js'))) {
+    const text = fs.readFileSync(path.join(dir, file), 'utf8');
+    for (const match of text.matchAll(/getLocalizedString\("([A-Z][A-Z_]*)"\)/g)) requested.add(match[1]);
+  }
+  assert.deepEqual(Object.keys(compat).sort(), [...requested].sort());
+  for (const value of Object.values(compat)) assert.match(value, /[А-Яа-яІіЇїЄє]/);
+  assert.match(source, /import ukCompat from '\.\/uk-compat\.json'/);
+  assert.match(source, /addTranslation\(\{ uk: \{ \.\.\.uk, \.\.\.ukExtra, \.\.\.ukCompat \} \}\)/);
+});
 test('entry rejects production app and contains no auth-key initialization', () => {
   assert.match(source, /appId !== '168437005e7f6fa2a'/);
   assert.doesNotMatch(source, /setAuthKey|subscribePresenceForAllUsers|localStorage|sessionStorage/);
