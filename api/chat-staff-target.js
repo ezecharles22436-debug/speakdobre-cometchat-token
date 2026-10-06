@@ -12,15 +12,19 @@ function createHandler(deps = {}) {
     shared.setCors(req,res,'POST, OPTIONS');res.setHeader('Cache-Control','no-store');
     if(req.method==='OPTIONS')return res.status(204).end();
     if(req.method!=='POST')return res.status(405).json({error:'Метод не підтримується.'});
-    if(env.VERCEL_ENV!=='preview'||env.COMETCHAT_APP_ID!=='168437005e7f6fa2a'||env.CHAT_STAFF_TARGET_ENABLED!=='true'||!roomReleaseReady(env))return res.status(503).json({error:'Контакти тимчасово недоступні.'});
+    const matchingApp = (env.VERCEL_ENV==='preview'&&env.COMETCHAT_APP_ID==='168437005e7f6fa2a') ||
+      (env.VERCEL_ENV==='production'&&env.COMETCHAT_APP_ID==='1677376866e3f736f');
+    if(!matchingApp||env.CHAT_STAFF_TARGET_ENABLED!=='true'||!roomReleaseReady(env))return res.status(503).json({error:'Контакти тимчасово недоступні.'});
     try {
       shared.assertAllowedOrigin(req);shared.assertJsonRequest(req);
       const {memberId}=await (deps.verifyMember||shared.verifyMember)(req);
+      if(env.VERCEL_ENV==='production'&&String(memberId).startsWith('mem_sb_'))return res.status(403).json({error:'Контакт недоступний.'});
       const {config}=trustedStaffConfig(env),role=roleForMember(memberId,config);
       if(!['moderator','super_moderator'].includes(role))return res.status(403).json({error:'Контакт недоступний.'});
       const body=typeof req.body==='string'?JSON.parse(req.body):req.body;
       if(!body||Object.keys(body).some(k=>!['targetUid','roomGuid'].includes(k))||!/^mem_[A-Za-z0-9_-]{1,96}$/.test(body.targetUid||'')||!ROOMS.some(r=>r.guid===body.roomGuid))return res.status(400).json({error:'Некоректний запит.'});
       if(body.targetUid===memberId||roleForMember(body.targetUid,config)!=='student')return res.status(403).json({error:'Контакт недоступний.'});
+      if(env.VERCEL_ENV==='production'&&body.targetUid.startsWith('mem_sb_'))return res.status(403).json({error:'Контакт недоступний.'});
       const chat=deps.chat||createRoomProvider();
       const actor=await chat.user(memberId);
       if(actor.role!==role)throw Error('role mismatch');

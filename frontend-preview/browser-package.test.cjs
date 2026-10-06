@@ -12,7 +12,7 @@ test('browser packaging intercepts SDK imports before Vite dependency resolution
   const config = fs.readFileSync('vite.browser.config.mjs', 'utf8');
   assert.match(config, /enforce: 'pre'/);
   assert.match(config, /CometChatException, PIN_SAVE_SENTINELS/);
-  assert.match(config, /outDir: 'browser-dist'/);
+  assert.match(config, /outDir: mode === 'live' \? 'production-dist' : 'browser-dist'/);
   for (const [name, version] of [['chat-sdk-javascript','4.2.0'],['calls-sdk-javascript','5.0.6']]) {
     assert.equal(JSON.parse(fs.readFileSync(`node_modules/@cometchat/${name}/package.json`)).version, version);
   }

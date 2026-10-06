@@ -1,15 +1,20 @@
 import { defineConfig } from 'vite';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { productionSource } from './production-build.mjs';
 
 // Preserve the pinned vendor UMD intact instead of reparsing it through Rollup.
 // The entry loads it before importing any UI Kit code. No remote CDN or auth key.
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   base: './',
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   plugins: [{
     name: 'pinned-chat-sdk',
     enforce: 'pre',
+    transform(source, id) {
+      if (mode !== 'live' || id.includes('node_modules')) return;
+      return { code: productionSource(source, id), map: null };
+    },
     resolveId(id) {
       if (id === '@cometchat/chat-sdk-javascript') return '\0chat-sdk-global';
       if (id === '@cometchat/calls-sdk-javascript') return '\0calls-sdk-global';
@@ -28,12 +33,13 @@ export default defineConfig({
       if (!host) throw Error('Authenticated Preview entry missing');
       const css = Object.keys(bundle).filter(name => name.endsWith('.css') && !name.includes('controls-preview'));
       this.emitFile({ type: 'asset', fileName: 'preview-manifest.json', source: JSON.stringify({ entry: host.fileName, css }) });
-      this.emitFile({ type: 'asset', fileName: 'preview-loader.mjs', source: readFileSync(resolve('preview-loader.mjs'), 'utf8') });
+      const loader = readFileSync(resolve('preview-loader.mjs'), 'utf8');
+      this.emitFile({ type: 'asset', fileName: 'preview-loader.mjs', source: mode === 'live' ? productionSource(loader, 'preview-loader.mjs') : loader });
     } },
   }],
   build: {
-    outDir: 'browser-dist',
+    outDir: mode === 'live' ? 'production-dist' : 'browser-dist',
     commonjsOptions: { include: [/node_modules/, /session-adapter\.cjs/] },
     rollupOptions: { input: ['browser.html', 'controls-preview.html', 'preview-host.mjs'], preserveEntrySignatures: 'strict' },
   },
-});
+}));

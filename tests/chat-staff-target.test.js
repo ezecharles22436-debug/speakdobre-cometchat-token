@@ -10,7 +10,12 @@ async function run(changes={}) {
   await createHandler(deps)({method:'POST',headers:{origin:'https://speakdobre.webflow.io','content-type':'application/json'},body:{targetUid:'mem_student',roomGuid:ROOMS[0].guid}},res);return res;
 }
 test('verified staff target returns only selected identifiers, not personal data',async()=>{const r=await run();assert.equal(r.statusCode,200);assert.deepEqual(r.body.target,{uid:'mem_student'});});
-test('production and disabled feature cannot authorize even with valid actor',async()=>{for(const change of [{VERCEL_ENV:'production'},{CHAT_STAFF_TARGET_ENABLED:'false'},{COMETCHAT_APP_ID:'production'}])assert.equal((await run({env:{...env,...change}})).statusCode,503);});
+test('mismatched environment and disabled feature cannot authorize even with valid actor',async()=>{for(const change of [{VERCEL_ENV:'production'},{CHAT_STAFF_TARGET_ENABLED:'false'},{COMETCHAT_APP_ID:'production'}])assert.equal((await run({env:{...env,...change}})).statusCode,503);});
+test('production requires its exact app and rejects Test Mode actors',async()=>{
+  const live={...env,VERCEL_ENV:'production',COMETCHAT_APP_ID:'1677376866e3f736f'};
+  assert.equal((await run({env:live})).statusCode,200);
+  assert.equal((await run({env:live,verifyMember:async()=>({memberId:'mem_sb_owner'})})).statusCode,403);
+});
 test('students cannot use staff target endpoint',async()=>{assert.equal((await run({verifyMember:async()=>({memberId:'mem_student'})})).statusCode,403);});
 test('inactive target cannot be authorized',async()=>{assert.equal((await run({access:()=>({allowed:false})})).statusCode,403);});
 test('nonshared group and provider role mismatch fail closed',async()=>{
