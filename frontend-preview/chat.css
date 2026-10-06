@@ -1,0 +1,15 @@
+.sd-isolated-chat { width:100%; min-width:0; height:min(760px,85dvh); color:#142442; font-family:Arial,sans-serif; }
+.sd-isolated-chat .cometchat { height:100%; min-width:0; --cometchat-primary-color:#087cca; }
+.sd-message-panel { display:flex; flex-direction:column; height:100%; min-height:0; min-width:0; overflow:hidden; border:1px solid #dce4f0; border-radius:20px; background:white; }
+.sd-message-list { flex:1; min-height:0; overflow:hidden; }
+.sd-isolated-chat>div:first-child { height:100%; min-height:0; }
+.sd-incoming-offer:not(:empty) { padding:16px; border:1px solid #dce4f0; border-radius:16px; background:#f4f7ff; }
+.sd-incoming-offer button { min-height:44px; margin:4px; padding:10px 16px; border:1px solid #9eb3cf; border-radius:10px; background:white; color:#142442; }
+.sd-call-media { min-height:280px; height:55dvh; }
+.sd-student-picker:empty { display:none; }
+.sd-student-picker { padding:16px; border:1px solid #dce4f0; border-radius:16px; background:#f8faff; margin-block:12px; }
+.sd-student-picker h3 { margin:0 0 12px; font-size:18px; }
+.sd-student-list { display:flex; gap:8px; flex-wrap:wrap; }
+.sd-student-picker button { min-height:44px; max-width:100%; overflow-wrap:anywhere; padding:10px 14px; border:1px solid #a7bbd5; border-radius:10px; color:#142442; background:white; cursor:pointer; }
+.sd-student-picker button:focus-visible { outline:3px solid #087cca; outline-offset:3px; }
+@media(max-width:600px) { .sd-isolated-chat { height:80dvh; } .sd-message-panel { border-radius:12px; } }

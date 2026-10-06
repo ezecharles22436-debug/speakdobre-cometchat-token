@@ -1,3 +1,10 @@
 {
-  "version": 2
+  "version": 2,
+  "headers": [{
+    "source": "/chat-preview/(.*)",
+    "headers": [
+      { "key": "Access-Control-Allow-Origin", "value": "https://speakdobre.webflow.io" },
+      { "key": "Cache-Control", "value": "no-cache" }
+    ]
+  }]
 }

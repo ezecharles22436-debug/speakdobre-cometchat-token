@@ -1,0 +1,166 @@
+SpeakDobre isolated UI Kit prototype - 7 October 2026
+
+LOCAL ONLY. NOT WIRED INTO WEBFLOW OR DEPLOYED.
+Pinned UI Kit 7.2.3, React 19.0.0. Dependencies installed without lifecycle scripts.
+Production app ID is explicitly rejected by entry point.
+No account credentials or shared Auth Key are embedded.
+Server session loader and existing server-confirmed group selector remain host responsibilities.
+Restricted renderer supplies joined-group/moderator routes through session-adapter.cjs.
+No user/group/global-conversation directory is mounted.
+TypeScript check passed; 12 local unit/source-contract tests passed.
+Ukrainian dictionary covers 669/669 pinned vendor UI Kit keys.
+Core and supplemental dictionaries are merged at initialization.
+Tests require exact vendor-key coverage, no shadowed entries, and preserved placeholders.
+Dictionary coverage does not prove visual layout, grammatical composition,
+or separate Calls SDK/browser-owned interface localization.
+All-in-one build was stopped after excessive vendor transform time.
+Modular build externalizes React and CometChat packages; host dependency
+resolution is required. Do not upload the generated JS directly to Webflow.
+
+Release blockers:
+- Verify Ukrainian wording in rendered dialogs, dates, uploads and accessibility text;
+  audit the separate Calls SDK UI and browser-owned permission prompts.
+- Browser visual checks at desktop and fresh mobile startup.
+- Real Preview SDK authentication, logout and reactivation checks.
+- Incoming call handling and staff calling verification; not implemented/verified in this shell.
+- Full moderator/owner workflows, including authorized student contact navigation and management.
+- Existing known peer lookup gap remains; UI controls do not fix provider permissions.
+- Bundle weight review before shipping.
+
+This prototype intentionally is not a drop-in replacement and must not be published as-is.
+
+Custom call controls implementation:
+- Vendor-supported path: https://www.cometchat.com/docs/calls/javascript/custom-control-panel
+- call-controls.mjs and call-controls.css implement a Ukrainian control bar using
+  documented mute/unmute, pause/resume, screen share and leaveSession methods.
+- No initiation, credentials, recording or endSessionForAll capability exposed.
+- Media and leave state follows SDK events, with timeout/failure feedback.
+- Connection loss disables controls; host must remount from fresh verified state.
+- This is NOT wired into chat.tsx yet. Session lifecycle and real device behavior
+  remain unverified. Hiding the default control panel does NOT localize every
+  vendor overlay, such as network/idle/permission screens or video menus.
+- Offline tests only: fake SDK methods, no call or permission prompts triggered.
+
+Call host integration:
+- call-session.mjs revalidates the host-provided grant before and after token
+  generation; rejects production app, student outgoing/peer calls and UID drift.
+- call-host.ts exports mountPreviewCall alongside the chat module. It mounts
+  the vendor media container plus custom controls and Ukrainian lifecycle status.
+- 27 local tests pass. No real call was made.
+- The authorization callback is an explicit unimplemented HOST requirement,
+  not a claim of a new server endpoint. Existing accepted-call signaling must
+  supply it and perform its own signaling cleanup. Not wired to Webflow/chat buttons.
+- SDK video overlays remain a localization release blocker. Custom control bar
+  does not replace all vendor dialogs. Production release is still prohibited.
+
+Incoming-call integration update (supersedes host-callback gap above):
+- chat.tsx now mounts incoming-calls.mjs after verified chat login.
+- Offers only provider-delivered user calls from fresh server staffContacts.
+- Accepted call grant is built from the provider acceptance response and checked
+  against getActiveCall plus fresh subscription/UID/role on each authorization.
+- Explicit chat auth token is passed to Calls SDK generateToken, matching the
+  vendor UI Kit flow; no separate Calls SDK login assumed.
+- mountPreviewCall is wired to accepted incoming calls and signaling endCall.
+- Cancellation during access lookup and acceptance is covered by race tests.
+- All of this remains local and untested against an actual call.
+- OUTGOING staff call buttons still use the vendor path; their replacement,
+  authorized staff-to-student navigation and vendor video overlays remain open.
+- Browser-ready dependency packaging and mobile/device verification remain open.
+
+Outgoing moderator integration (supersedes vendor outgoing gap above):
+- Added default-off, Preview-app-only backend api/chat-staff-target.js in the
+  room-ui-localization checkout. It checks server staff identity, provider role,
+  shared managed-group membership and target's active subscription. Read-only.
+- Requires new Preview setting CHAT_STAFF_TARGET_ENABLED=true after deployment;
+  no configuration or deployment was performed.
+- staff-target-client.mjs pins the existing Preview alias and blocks redirects.
+- mountPreviewChat accepts this client as authorizeStudent; open('user',uid,roomGuid)
+  revalidates the selected student before and after SDK login.
+- Outgoing header buttons now route through outgoing-calls.mjs, not vendor
+  defaults. Group-call buttons are not exposed by this prototype.
+- Staff target selection UI is still needed (no broad user directory introduced).
+- Peer lookup residual risk is unchanged. No actual call was placed.
+
+Read-only browser/source audit - 7 October 2026:
+- Existing Webflow staging still runs the older hosted widget. English labels
+  observed: 1 Member, Search, Enter your message here, Attach, Sticker, Emoji,
+  Voice Recording, Send Message. New local module is not loaded there.
+- At requested 390x844 viewport, page clientWidth and scrollWidth both 375;
+  iframe element width 353. Inner iframe overflow was not readable in this
+  observation, so no claim about its internal scroll width. Viewport reset.
+- No messages, calls, recordings, permissions or site edits performed.
+- Calls SDK 5.0.6 index.d.ts declares setLocalizedStringObject, but the actual
+  dist/index.es.js implementation logs that it is deprecated and has no effect.
+  Runtime has an English-only initial translation store. The old method must
+  not be used as proof of Ukrainian calling support. A supported custom call
+  interface or compatible SDK path needs investigation before release.
+- Browser verification of the NEW module remains pending; baseline staging
+  inspection is not equivalent to verification of the local build.
+
+Group-scoped moderator picker verification - 7 October 2026:
+- Added student-picker.mjs and wired it into authorized moderator group views.
+- Member pages load only on request, scoped to that group, with fresh session
+  checks before and after fetch. No site-wide member directory was introduced.
+- Selecting a participant requires the server target check; the session adapter
+  repeats target authorization before and after SDK login. Revoked or mismatched
+  actor, role, target or group grants do not render a student conversation.
+- Seven picker tests and three additional session-adapter tests added.
+- All 51 local prototype tests passed; TypeScript passed; modular Vite build
+  passed (79.60 kB JavaScript, 2.19 kB CSS, before compression).
+- This supersedes the earlier missing staff target selection UI note.
+- No deployment, configuration, Webflow edit, real call or customer action.
+- Remaining release gates: browser-ready dependency packaging, actual new-UI
+  browser/mobile verification, vendor call-overlay localization, and controlled
+  Preview integration tests. Existing staging remains the older hosted widget.
+
+Browser packaging breakthrough - 7 October 2026:
+- Added separate vite.browser.config.mjs, browser.html and browser-entry.mjs.
+- Production-named Vite build means optimized local output, NOT a deployment.
+- SDK imports are intercepted before Vite resolution. Chat SDK 4.2.0 UMD is
+  emitted intact; Calls SDK 5.0.6 UMD has only process.env.NODE_ENV resolved to
+  the build-time production literal, without adding a global process object.
+- React/UI Kit and CSS are bundled; no unresolved npm imports or CDN required
+  for this package loading check. SDKs load before the chat module is imported.
+- Build passed in 12.11 seconds. Browser at 127.0.0.1:4198/browser.html visibly
+  reported the package loaded without chat login. No console errors observed;
+  one vendor Jitsi analytics-disabled warning was observed.
+- This supersedes browser-ready packaging as a blocker for basic import testing.
+- Not yet an authenticated full UI test. Import itself initializes vendor
+  internals; no chat init/login, message or call was invoked by the harness.
+- Raw output remains substantial: Chat SDK 603 kB, Calls SDK 2.30 MB, main UI
+  chunk 1.99 MB, CSS 943 kB plus fonts/lazy chunks. Mobile performance and media
+  runtime assets still require validation; do not equate import success with
+  working calls or a production-ready integration.
+- Nothing pushed, deployed, configured or published.
+
+Synthetic controls browser verification - 7 October 2026:
+- Added controls-preview.html/mjs/css with fixture-only group participants and
+  event-driven fake call SDK. No account, network call or media permissions.
+- Verified moderator on-demand list and successful synthetic selection; after
+  access revocation, another selection is rejected with Ukrainian feedback.
+- Verified simulated microphone state change and disabled controls on connection
+  loss. Corrected misleading automatic-reconnect wording to explicit reopen steps.
+- Mobile requested 390x844: client/scroll widths both 375, visible buttons >=44px,
+  long participant name wrapped. Added module-level button wrapping safeguards.
+- Reloaded rebuilt page and verified corrected recovery text and same no-overflow
+  measurement. Full-page mobile screenshot timed out; no mobile image delivered.
+- Restored viewport, saved desktop screenshot in outputs/chat-controls-desktop-
+  2026-10-07.jpg. Browser console contained no errors for controls harness.
+- 53 local tests pass and browser rebuild passes. This verifies custom controls,
+  not authenticated UI Kit conversations, actual media or provider permissions.
+
+Authenticated host preparation - 7 October 2026:
+- Added preview-session-client.mjs: exact staging origin and Preview endpoint,
+  Test Mode member IDs only, fresh in-memory credentials, redirects disabled,
+  identity checks around credential retrieval and server responses. No token logs.
+- Added preview-flow.mjs and preview-host.mjs. Reuses existing room selector and
+  navigation through explicit dependencies. Students must finish server-backed
+  selection before chat mounts; staff bypass selector without auto-opening chats.
+- Account/role changes abort; disposal during SDK mount closes the late result.
+- Exposes a named browser host entry with no automatic startup. The future
+  staging embed must load the pinned SDKs first and disable concurrent old widget
+  startup. It is not installed into Webflow and has not used real credentials.
+- Nine additional tests pass; full local suite now 62 passing. TypeScript passes.
+- Next external gate: deploy reviewed host plus default-off staff endpoint to
+  isolated Preview, set Preview-only CHAT_STAFF_TARGET_ENABLED, and swap staging
+  bootstrap for designated-account verification. Production must remain untouched.
