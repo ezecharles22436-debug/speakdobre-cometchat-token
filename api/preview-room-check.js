@@ -1,8 +1,8 @@
 // TEMPORARY: remove with PREVIEW_ROOM_TEST_SECRET after isolated SDK checks.
 const crypto = require('node:crypto');
 const APP = '168437005e7f6fa2a';
-const USERS = { student: 'mem_preview_contacts_student', peer: 'mem_preview_contacts_peer', moderator: 'mem_preview_contacts_moderator', owner: 'mem_preview_contacts_owner' };
-const PRIVATE = 'preview-contacts-private';
+const USERS = { student: 'mem_preview_contacts2_student', peer: 'mem_preview_contacts2_peer', moderator: 'mem_preview_contacts2_moderator', owner: 'mem_preview_contacts2_owner' };
+const PRIVATE = 'preview-contacts2-private';
 const EXPIRES_AT = Date.parse('2026-10-06T11:00:00Z');
 function permitted(env, now=Date.now()) {
   return now < EXPIRES_AT && env.VERCEL_ENV === 'preview' && env.VERCEL_GIT_COMMIT_REF === 'codex/practice-chat-room-selection' &&
@@ -56,7 +56,7 @@ function createHandler(env=process.env,fetcher=fetch) {
         if(user.role!==role)throw new Error('Synthetic role mismatch');
         sessions[label]=(await api(`/users/${uid}/auth_tokens`,'POST',{})).authToken;
       }
-      for(const [guid,type] of [[PRIVATE,'private'],['preview-contacts-public','public']]){
+      for(const [guid,type] of [[PRIVATE,'private'],['preview-contacts2-public','public']]){
         let group;try{group=await api(`/groups/${guid}`);}catch(e){if(e.status!==404)throw e;}
         if(!group)await api('/groups','POST',{guid,name:`Synthetic ${type} room`,type,owner:USERS.owner});
       }
@@ -108,7 +108,7 @@ await check('student cannot privately message peer',false,()=>msg(data.users.pee
 await check('student can message moderator',true,()=>msg(data.users.moderator));
 await check('student can message owner',true,()=>msg(data.users.owner));
 await check('student can message joined group',true,()=>msg('${PRIVATE}','group'));
-await check('student cannot join public group directly',false,()=>CometChat.joinGroup('preview-contacts-public',CometChat.GROUP_TYPE.PUBLIC,''));
+await check('student cannot join public group directly',false,()=>CometChat.joinGroup('preview-contacts2-public',CometChat.GROUP_TYPE.PUBLIC,''));
 await check('student cannot create group',false,()=>CometChat.createGroup(new CometChat.Group('preview-student-create-check','Synthetic forbidden group',CometChat.GROUP_TYPE.PRIVATE)));
 await check('student directory excludes peers',true,()=>new CometChat.UsersRequestBuilder().setLimit(100).build().fetchNext(),list=>list.every(u=>['moderator','super_moderator'].includes(u.getRole())));
 await check('student cannot inspect peer profile',false,()=>CometChat.getUser(data.users.peer));
@@ -125,6 +125,8 @@ await privacy('known outbound peer message is inaccessible',()=>CometChat.getMes
 await privacy('peer thread history inaccessible',()=>new CometChat.MessagesRequestBuilder().setParentMessageId(Number(data.fixtures.peerInbound)).setLimit(100).build().fetchPrevious());
 await check('group history keeps peer own and staff messages',true,()=>new CometChat.MessagesRequestBuilder().setGUID('${PRIVATE}').setLimit(100).build().fetchPrevious(),list=>contains(list,['groupPeer','groupStudent','groupModerator']));
 await check('group thread history keeps peer replies',true,()=>new CometChat.MessagesRequestBuilder().setParentMessageId(Number(data.fixtures.groupPeer)).setLimit(100).build().fetchPrevious(),list=>contains(list,['groupThread']));
+await check('group-scoped thread history keeps peer replies',true,()=>new CometChat.MessagesRequestBuilder().setGUID('${PRIVATE}').setParentMessageId(Number(data.fixtures.groupPeer)).setLimit(100).build().fetchPrevious(),list=>contains(list,['groupThread']));
+await privacy('peer-scoped thread stays inaccessible',()=>new CometChat.MessagesRequestBuilder().setUID(data.users.peer).setParentMessageId(Number(data.fixtures.peerInbound)).setLimit(100).build().fetchPrevious());
 await check('group message details readable',true,()=>CometChat.getMessageDetails(Number(data.fixtures.groupPeer)),m=>String(m.getId())===data.fixtures.groupPeer);
 await check('moderator history keeps both directions',true,()=>new CometChat.MessagesRequestBuilder().setUID(data.users.moderator).setLimit(100).build().fetchPrevious(),list=>contains(list,['moderatorInbound','moderatorOutbound']));
 await check('owner history keeps both directions',true,()=>new CometChat.MessagesRequestBuilder().setUID(data.users.owner).setLimit(100).build().fetchPrevious(),list=>contains(list,['ownerInbound','ownerOutbound']));
@@ -138,7 +140,7 @@ await check('moderator cannot promote self to admin',false,()=>CometChat.updateG
 await check('moderator can initiate then cancel student call',true,async()=>{const c=await CometChat.initiateCall(new CometChat.Call(data.users.student,CometChat.CALL_TYPE.AUDIO,CometChat.RECEIVER_TYPE.USER));await CometChat.rejectCall(c.getSessionId(),CometChat.CALL_STATUS.CANCELLED);return c;});
 await check('moderator can kick a synthetic participant',true,()=>CometChat.kickGroupMember('${PRIVATE}',data.users.peer));
 await CometChat.logout();await CometChat.login(data.sessions.owner);
-await check('owner can delete synthetic public room',true,()=>CometChat.deleteGroup('preview-contacts-public'));
+await check('owner can delete synthetic public room',true,()=>CometChat.deleteGroup('preview-contacts2-public'));
 await CometChat.logout();output.textContent+='\\nFinished';
 }catch(e){output.textContent+='\\nStopped: '+String(e.code||e.name||'unknown');}};
 document.querySelector('#cleanup').onclick=async function(){this.disabled=true;try{await CometChat.logout();}catch(_){}const response=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({secret:${secret},action:'cleanup'})});output.textContent+=response.ok?'\\nCleanup confirmed':'\\nCleanup failed';};
