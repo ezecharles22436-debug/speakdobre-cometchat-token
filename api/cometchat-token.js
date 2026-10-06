@@ -1,5 +1,5 @@
 const MEMBERSTACK_BASE_URL = "https://admin.memberstack.com";
-const { roleForMember } = require('./_chat-room-policy');
+const { roleForMember, ROOMS } = require('./_chat-room-policy');
 const { roomReleaseReady } = require('./_chat-room-release');
 const { createRoomProvider } = require('./_chat-room-provider');
 const { prepareRoomAccess } = require('./_chat-room-staff');
@@ -306,6 +306,11 @@ async function getVisibleRoomsForUser(uid) {
 }
 
 function configuredRooms() {
+  // Keep navigation labels consistent with the Ukrainian selection catalog.
+  // The legacy production configuration is unchanged while this release is off.
+  if (roomReleaseReady(process.env)) {
+    return ROOMS.map(room => ({ ...room, level: room.kind === 'level' ? room.name.split(' · ')[0] : '' }));
+  }
   const raw = String(process.env.SPEAKDOBRE_CHAT_ROOMS || "").trim();
   if (raw) {
     try {
@@ -518,5 +523,5 @@ class HttpError extends Error {
   }
 }
 
-module.exports._test = { getPracticeChatAccess, roomRoleForMember, ensureCometChatUser };
+module.exports._test = { getPracticeChatAccess, roomRoleForMember, ensureCometChatUser, configuredRooms };
 module.exports.getPracticeChatAccess = getPracticeChatAccess;
