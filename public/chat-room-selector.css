@@ -1,0 +1,28 @@
+.sd-room-picker{--sd-ink:#142343;--sd-muted:#66728c;color:var(--sd-ink);font:16px/1.55 Arial,sans-serif;max-width:1040px;margin:auto}
+.sd-room-picker *{box-sizing:border-box}
+.sd-room-picker h2{font-size:clamp(30px,4vw,46px);line-height:1.15;letter-spacing:-1.3px;margin:0 0 16px}
+.sd-room-picker>p{color:var(--sd-muted);max-width:660px;margin:0 0 30px}
+.sd-room-picker fieldset{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 26px;padding:22px;background:#fff;border:1px solid #e2e7f1;border-radius:22px;min-width:0}
+.sd-room-picker fieldset+fieldset{grid-template-columns:repeat(3,minmax(0,1fr))}
+.sd-room-picker legend{font-weight:700;font-size:18px;padding:0 10px}
+.sd-room-choice{position:relative;display:flex;gap:12px;align-items:flex-start;padding:20px 16px;border:1px solid #dfe5ef;border-radius:14px;cursor:pointer;transition:border-color .18s,background .18s;min-width:0}
+.sd-room-choice:hover{background:#faf8ff;border-color:#b59ddd}
+.sd-room-choice:has(input:checked){background:#f5f0fd;border-color:#8961c6;box-shadow:inset 0 0 0 1px #8961c6}
+.sd-room-choice:has(input:focus-visible){outline:3px solid #2683ce;outline-offset:3px}
+.sd-room-choice:has(input:disabled){opacity:.5;cursor:not-allowed}
+.sd-room-choice input{flex:0 0 18px;width:18px;height:18px;margin:3px 0 0;accent-color:#8053bf}
+.sd-room-choice strong,.sd-room-choice small{display:block}
+.sd-room-choice strong{font-size:15px;line-height:1.4;margin-bottom:8px}
+.sd-room-choice small{font-size:13px;color:var(--sd-muted);line-height:1.5}
+.sd-room-status{font-size:14px;color:#665187;min-height:24px;margin:16px 0}
+.sd-room-actions{display:flex;align-items:center;gap:15px;flex-wrap:wrap}
+.sd-room-count{font-weight:700;margin:0 auto 0 0}
+.sd-room-actions button{font:inherit;cursor:pointer;border-radius:12px;min-height:48px;padding:13px 20px}
+.sd-room-primary{border:0;background:linear-gradient(110deg,#147bd0,#a537db);color:white;font-weight:700!important}
+.sd-room-refresh{border:1px solid #dce2ee;background:white;color:#435574}
+.sd-room-actions button:disabled{opacity:.45;cursor:not-allowed}
+.sd-room-actions button:focus-visible{outline:3px solid #2585d3;outline-offset:3px}
+@media(max-width:800px){.sd-room-picker fieldset{grid-template-columns:repeat(2,minmax(0,1fr))}.sd-room-picker fieldset+fieldset{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.sd-room-picker fieldset,.sd-room-picker fieldset+fieldset{grid-template-columns:1fr;padding:14px;gap:10px}.sd-room-choice{padding:16px}.sd-room-actions{display:grid;grid-template-columns:1fr;width:100%}.sd-room-actions button{width:100%}.sd-room-count{margin-bottom:4px}}
+@media(prefers-reduced-motion:reduce){.sd-room-picker *{transition:none!important}}
+

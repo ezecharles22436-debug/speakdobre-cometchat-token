@@ -1,9 +1,10 @@
 const MEMBERSTACK_BASE_URL = "https://admin.memberstack.com";
 const { roleForMember } = require('./_chat-room-policy');
+const { roomReleaseReady } = require('./_chat-room-release');
 
 function roomRoleForMember(memberId, env = process.env) {
   if (env.CHAT_ROOMS_ENABLED !== 'true') return null;
-  if (env.CHAT_ROOMS_PERMISSIONS_VERIFIED !== 'true') {
+  if (!roomReleaseReady(env)) {
     throw new HttpError(503, 'Practice Chat permissions are not ready.');
   }
   return roleForMember(memberId, {
@@ -515,3 +516,4 @@ class HttpError extends Error {
 
 module.exports._test = { getPracticeChatAccess, roomRoleForMember, ensureCometChatUser };
 module.exports.getPracticeChatAccess = getPracticeChatAccess;
+

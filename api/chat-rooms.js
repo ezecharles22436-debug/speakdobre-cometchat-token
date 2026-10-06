@@ -4,6 +4,7 @@ const { ROOMS, roleForMember, SelectionError } = require('./_chat-room-policy');
 const { createRoomSelectionService, RoomChangeError } = require('./_chat-room-selection');
 const { createRoomStore } = require('./_chat-room-store');
 const { createRoomProvider } = require('./_chat-room-provider');
+const { roomReleaseReady } = require('./_chat-room-release');
 
 function createHandler(deps = {}) {
   const env = deps.env || process.env;
@@ -14,8 +15,8 @@ function createHandler(deps = {}) {
       res.setHeader('Allow', 'GET, POST, OPTIONS');
       return res.status(405).json({ error: 'Метод не підтримується.' });
     }
-    // Feature is disabled by default, and requires explicit RBAC verification.
-    if (env.CHAT_ROOMS_ENABLED !== 'true' || env.CHAT_ROOMS_PERMISSIONS_VERIFIED !== 'true') {
+    // Feature remains default-off. A recorded exception never implies all checks passed.
+    if (!roomReleaseReady(env)) {
       return res.status(503).json({ error: 'Вибір груп тимчасово недоступний.' });
     }
     try {
@@ -60,3 +61,4 @@ function createHandler(deps = {}) {
 }
 module.exports = createHandler();
 module.exports.createHandler = createHandler;
+

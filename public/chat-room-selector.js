@@ -41,13 +41,20 @@
     const intro = el('p', 'Одна група за рівнем англійської та до двох груп за інтересами. Усього — до трьох груп.');
     const form = el('form'), fields = el('div'), status = el('p'), save = el('button', 'Зберегти та відкрити чат');
     const refresh = el('button', 'Оновити стан');
+    const count = el('p', 'Обрано 0 із 3 груп'), actions = el('div');
+    count.className = 'sd-room-count'; count.setAttribute('aria-live', 'polite');
+    actions.className = 'sd-room-actions';
+    save.className = 'sd-room-primary'; refresh.className = 'sd-room-refresh';
+    status.className = 'sd-room-status'; fields.className = 'sd-room-fields';
     status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     save.type = 'submit'; refresh.type = 'button';
-    form.append(fields, status, save, refresh); container.replaceChildren(heading, intro, form);
+    actions.append(count, save, refresh);
+    form.append(fields, status, actions); container.replaceChildren(heading, intro, form);
     container.classList.add('sd-room-picker');
     const selected = () => controls.filter(input => input.checked).map(input => input.value);
     function update() {
       const topics = controls.filter(input => input.type === 'checkbox' && input.checked).length;
+      count.textContent = `Обрано ${selected().length} із 3 груп`;
       controls.forEach(input => { input.disabled = busy || pending || (input.type === 'checkbox' && !input.checked && topics >= 2); });
       save.disabled = busy || pending || !validSelection(catalog, selected());
       refresh.disabled = busy;
@@ -66,8 +73,15 @@
             const label = el('label'), input = el('input'), copy = el('span');
             input.type = kind === 'level' ? 'radio' : 'checkbox'; input.name = kind === 'level' ? 'sd-room-level' : 'sd-room-topic';
             input.value = room.guid; input.checked = data.selected.includes(room.guid);
+            label.className = 'sd-room-choice';
             copy.append(el('strong', room.name), el('small', room.description)); label.append(input, copy);
-            fieldset.append(label); controls.push(input); input.addEventListener('change', update);
+            fieldset.append(label); controls.push(input); input.addEventListener('change', () => {
+              update();
+              status.textContent = !selected().some(id => catalog.some(r => r.guid === id && r.kind === 'level'))
+                ? 'Оберіть одну групу за рівнем англійської.'
+                : selected().length === 3 ? 'Три групи обрано. Ви готові до спілкування.'
+                : 'Можна продовжити або додати групи за інтересами.';
+            });
           }
           fields.append(fieldset);
         }
@@ -98,3 +112,4 @@
   }
   return { createClient, validSelection, mount };
 });
+
