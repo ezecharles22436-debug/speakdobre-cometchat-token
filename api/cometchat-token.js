@@ -288,8 +288,20 @@ async function reactivateCometChatUser(uid) {
   });
 }
 
-async function getVisibleRoomsForUser(uid) {
+async function getVisibleRoomsForUser(uid, provider) {
   const rooms = configuredRooms();
+
+  // A per-group member lookup can error for a banned user. One inaccessible
+  // group must not prevent entry to the selector or to unrelated joined groups.
+  // Use the same complete, identity-scoped membership list as the selector.
+  // Do not catch provider failures or infer membership from a saved preference.
+  if (roomReleaseReady(process.env)) {
+    const memberships = await (provider || createRoomProvider()).memberships(uid);
+    const joined = new Set(memberships.map(room => room.guid));
+    return rooms.map(room => ({ guid: room.guid, name: room.name,
+      level: room.level || '', description: room.description || '',
+      unlocked: joined.has(room.guid) }));
+  }
 
   return Promise.all(
     rooms.map(async room => {
@@ -523,5 +535,5 @@ class HttpError extends Error {
   }
 }
 
-module.exports._test = { getPracticeChatAccess, roomRoleForMember, ensureCometChatUser, configuredRooms };
+module.exports._test = { getPracticeChatAccess, roomRoleForMember, ensureCometChatUser, configuredRooms, getVisibleRoomsForUser };
 module.exports.getPracticeChatAccess = getPracticeChatAccess;
