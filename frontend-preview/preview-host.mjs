@@ -1,13 +1,16 @@
 import { mountPreviewChat, createStaffTargetClient } from './chat.tsx';
 import { createPreviewSessionClient, PREVIEW_ORIGIN } from './preview-session-client.mjs';
 import { createPreviewFlow } from './preview-flow.mjs';
+import { createStartupSession } from './startup-session.mjs';
 
 // Explicit host entry only; never auto-runs on import. The approved staging embed
 // must load pinned SDK assets first and must NOT run the old widget concurrently.
 export async function mountAuthenticatedPreview({ container, memberstack, roomSelector, roomNavigation }) {
   if (!container || container.ownerDocument.defaultView.location.origin !== 'https://speakdobre.webflow.io') throw Error('Доступна лише тестова сторінка.');
   if (!roomSelector?.createClient || !roomSelector?.mount || !roomNavigation?.mount) throw Error('Не завантажено вибір груп.');
-  const { getSession, getMemberstackToken } = createPreviewSessionClient({ pageOrigin: container.ownerDocument.defaultView.location.origin, memberstack });
+  const { getSession: loadSession, getMemberstackToken } = createPreviewSessionClient({ pageOrigin: container.ownerDocument.defaultView.location.origin, memberstack });
+  const startup = createStartupSession({ load: loadSession, checkIdentity: getMemberstackToken });
+  const getSession = () => startup.getSession();
   // Validate account and entitlement before changing the host area or initializing SDK.
   await getSession();
   const doc = container.ownerDocument;
@@ -32,4 +35,5 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
   });
   try { await flow.start({ chooseGroups: doc.defaultView.location.hash === '#choose-groups' }); return flow; }
   catch (error) { await flow.dispose(); throw error; }
+  finally { startup.finish(); }
 }

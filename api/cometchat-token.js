@@ -70,7 +70,8 @@ module.exports = async function handler(req, res) {
     const roomAccess = role ? await prepareRoomAccess({ uid, role, chat: createRoomProvider() }) : null;
     await reactivateCometChatUser(uid);
     const token = await createCometChatToken(uid);
-    const rooms = await getVisibleRoomsForUser(uid);
+    const rooms = await getVisibleRoomsForUser(uid, roomAccess?.memberships
+      ? { memberships: async () => roomAccess.memberships } : undefined);
 
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({

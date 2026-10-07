@@ -1,5 +1,12 @@
 const { ROOMS, roleForMember } = require('./_chat-room-policy');
 
+// Bound provider traffic while avoiding one network round trip per room.
+async function checkInBatches(items, check) {
+  for (let i = 0; i < items.length; i += 4) {
+    await Promise.all(items.slice(i, i + 4).map(check));
+  }
+}
+
 function trustedStaffConfig(env = process.env) {
   const parse = value => [...new Set(String(value || '').split(',').map(s => s.trim()).filter(Boolean))];
   const config = { superModeratorIds: parse(env.CHAT_SUPER_MODERATOR_IDS), moderatorIds: parse(env.CHAT_MODERATOR_IDS) };
@@ -20,10 +27,10 @@ async function prepareRoomAccess({ uid, role, chat, env = process.env }) {
   if (role === 'student') {
     // Validate every contact before any write. A stale/demoted staff ID cannot
     // accidentally become an allowed peer-history friendship.
-    for (const id of ids) {
+    await checkInBatches(ids, async id => {
       const staff = await chat.user(id);
       if (staff.role !== roleForMember(id, config)) throw new Error('Staff role mismatch');
-    }
+    });
     const checkFriends = rows => {
       if (rows.some(row => !ids.includes(row.uid) || row.role !== roleForMember(row.uid, config))) {
         throw new Error('Unexpected private contacts require review');
@@ -32,6 +39,7 @@ async function prepareRoomAccess({ uid, role, chat, env = process.env }) {
     const before = await chat.friends(uid);
     checkFriends(before);
     const missing = ids.filter(id => !before.some(row => row.uid === id));
+    if (!missing.length) return { contacts: ids };
     await chat.addFriends(uid, missing);
     const after = await chat.friends(uid);
     checkFriends(after);
@@ -44,7 +52,12 @@ async function prepareRoomAccess({ uid, role, chat, env = process.env }) {
   for (const room of ROOMS) {
     const current = before.find(row => row.guid === room.guid);
     if (current && current.scope !== scope) throw new Error('Existing staff scope requires review');
+  }
+  await checkInBatches(ROOMS, async room => {
     if (await chat.isBanned(room.guid, uid)) throw new Error('Staff ban requires review');
+  });
+  if (ROOMS.every(room => before.some(row => row.guid === room.guid))) {
+    return { contacts: [], memberships: before };
   }
   for (const room of ROOMS) {
     if (!before.some(row => row.guid === room.guid)) await chat.addStaff(room.guid, uid, scope);
@@ -53,6 +66,6 @@ async function prepareRoomAccess({ uid, role, chat, env = process.env }) {
   if (ROOMS.some(room => !after.some(row => row.guid === room.guid && row.scope === scope))) {
     throw new Error('Staff memberships verification failed');
   }
-  return { contacts: [] };
+  return { contacts: [], memberships: after };
 }
 module.exports = { trustedStaffConfig, prepareRoomAccess };
