@@ -14,14 +14,22 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
   const picker = doc.createElement('section'), rail = doc.createElement('nav'), chat = doc.createElement('div');
   container.replaceChildren(picker, rail, chat);
   const authorizeStudent = createStaffTargetClient({ endpoint: `${PREVIEW_ORIGIN}/api/chat-staff-target`, getMemberstackToken });
+  const selectionClient = roomSelector.createClient({ endpoint: `${PREVIEW_ORIGIN}/api/chat-rooms`, getToken: getMemberstackToken });
   const flow = createPreviewFlow({
     getSession,
-    showSelector: ({ onReady }) => roomSelector.mount({ container: picker, client: roomSelector.createClient({ endpoint: `${PREVIEW_ORIGIN}/api/chat-rooms`, getToken: getMemberstackToken }), onReady }),
-    hideSelector: () => { picker.hidden = true; },
+    hasSavedSelection: async () => {
+      const saved = await selectionClient.load();
+      return saved.pending === false && roomSelector.validSelection(saved.rooms, saved.selected);
+    },
+    showSelector: ({ onReady }) => roomSelector.mount({ container: picker, client: selectionClient, onReady }),
+    hideSelector: () => {
+      picker.hidden = true;
+      if (doc.defaultView.location.hash === '#choose-groups') doc.defaultView.history.replaceState(null, '', doc.defaultView.location.pathname + doc.defaultView.location.search);
+    },
     mountChat: () => mountPreviewChat({ container: chat, appId: '168437005e7f6fa2a', getSession, authorizeStudent }),
-    mountNavigation: options => roomNavigation.mount({ ...options, root: rail, onChangeGroups: () => doc.defaultView.location.reload() }),
+    mountNavigation: options => roomNavigation.mount({ ...options, root: rail, onChangeGroups: () => { doc.defaultView.location.hash = 'choose-groups'; doc.defaultView.location.reload(); } }),
     clear: () => { container.replaceChildren(); },
   });
-  try { await flow.start(); return flow; }
+  try { await flow.start({ chooseGroups: doc.defaultView.location.hash === '#choose-groups' }); return flow; }
   catch (error) { await flow.dispose(); throw error; }
 }

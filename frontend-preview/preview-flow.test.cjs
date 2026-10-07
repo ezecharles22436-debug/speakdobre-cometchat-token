@@ -16,6 +16,26 @@ test('student cannot mount chat until server-backed selector signals readiness',
 test('staff bypass selector but never auto-open a conversation', async () => {
   const f = await fixture('moderator'); await f.flow.start(); assert.deepEqual(f.events, ['chat','nav','hide']);
 });
+
+test('returning student opens navigation after server verifies saved selection', async () => {
+  const f = await fixture('student', { hasSavedSelection: async () => true });
+  await f.flow.start(); assert.deepEqual(f.events, ['chat','nav','hide']);
+});
+
+test('explicit change-groups intent still opens selector for returning student', async () => {
+  const f = await fixture('student', { hasSavedSelection: async () => true });
+  await f.flow.start({ chooseGroups: true }); assert.deepEqual(f.events, ['selector']);
+});
+
+test('unverified or pending memberships do not bypass selector', async () => {
+  const f = await fixture('student', { hasSavedSelection: async () => false });
+  await f.flow.start(); assert.deepEqual(f.events, ['selector']);
+});
+
+test('failed membership verification never mounts chat', async () => {
+  const f = await fixture('student', { hasSavedSelection: async () => { throw Error('Unavailable'); } });
+  await assert.rejects(f.flow.start(), /Unavailable/); assert.deepEqual(f.events, []);
+});
 test('changed identity after selecting groups cannot mount chat', async () => {
   const f = await fixture(); await f.flow.start(); f.session.user.uid = 'mem_sb_other';
   await assert.rejects(f.selector().onReady()); assert.ok(!f.events.includes('chat'));
