@@ -94,7 +94,8 @@ export async function mountPreviewChat({ container, appId, getSession, authorize
         onEnded:()=>{activeCall?.dispose();activeCall=undefined;},
         onError:message=>{offers.textContent=message;},
       });
-      root.render(<CometChatProvider theme="light" locale="uk">
+      root.render(<CometChatProvider theme="light" locale="uk" moderation={view.type==='group'&&view.canStartCalls?
+        {identity:{uid:CometChatUIKit.getLoggedInUser()?.getUid()||'',role:view.role},roomGuid:view.id,getSession}:undefined}>
         <section className="sd-message-panel" aria-label="Кімната розмовної практики">
           <CometChatMessageHeader {...entity} hideBackButton hideUserStatus
             hideVoiceCallButton={!outgoing} hideVideoCallButton={!outgoing}

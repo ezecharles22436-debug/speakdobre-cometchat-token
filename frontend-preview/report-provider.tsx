@@ -3,6 +3,7 @@ import { CometChat } from '@cometchat/chat-sdk-javascript';
 import { CometChatProvider, CometChatFlagMessageDialog, defaultPlugins,
   useCometChatFlagMessageDialogContext } from '@cometchat/chat-uikit-react';
 import { reportReasonLabel, reportErrorText, submitReport } from './report-policy.mjs';
+import { addStaffDeleteOption, authorizeStaffDelete } from './moderation-policy.mjs';
 
 function UkrainianReasons() {
   const {flagReasons,selectedReason,selectReason,isLoadingReasons,isLoading}=useCometChatFlagMessageDialogContext();
@@ -16,18 +17,32 @@ function UkrainianReasons() {
   </fieldset>;
 }
 
-export function ReportProvider({children,...props}:React.ComponentProps<typeof CometChatProvider>) {
+type Moderation = {identity:{uid:string;role:string};roomGuid:string;getSession:()=>Promise<any>};
+export function ReportProvider({children,moderation,...props}:React.ComponentProps<typeof CometChatProvider>&{moderation?:Moderation}) {
   const [message,setMessage]=useState<CometChat.BaseMessage|null>(null);
   const [notice,setNotice]=useState('');
   const [error,setError]=useState('');
+  const [moderationError,setModerationError]=useState('');
   const plugins=useMemo(()=>defaultPlugins.map(plugin=>({...plugin,
-    getOptions:plugin.getOptions ? (item,context)=>plugin.getOptions!(item,{
+    getOptions:plugin.getOptions ? (item,context)=>{
+      const options=plugin.getOptions!(item,{
       ...context,onFlagMessage:target=>{setError('');setNotice('');setMessage(target);},
-    }):undefined,
-  })),[]);
+      });
+      if(!moderation)return options;
+      return addStaffDeleteOption(options,{...moderation,group:context.group,message:item,
+        hidden:context.hideDeleteMessageOption,
+        onDelete:async()=>{
+          setModerationError('');
+          try{await authorizeStaffDelete({...moderation,message:item,sdk:CometChat});context.onDeleteMessage?.(item);}
+          catch{setModerationError('Не вдалося перевірити права модератора. Відкрийте групу повторно.');}
+        },
+      });
+    }:undefined,
+  })),[moderation]);
   return <CometChatProvider {...props} plugins={plugins}>
     {children}
     {notice&&<p role="status">{notice}</p>}
+    {moderationError&&<p role="alert">{moderationError}</p>}
     {message&&<CometChatFlagMessageDialog.Root message={message} isOpen onClose={()=>setMessage(null)}
       onSubmit={async(id,reason,remark)=>{
         setError('');
