@@ -10,6 +10,12 @@
 .sd-student-picker { padding:16px; border:1px solid #dce4f0; border-radius:16px; background:#f8faff; margin-block:12px; }
 .sd-student-picker h3 { margin:0 0 12px; font-size:18px; }
 .sd-student-list { display:flex; gap:8px; flex-wrap:wrap; }
+.sd-student-row { display:flex; flex-wrap:wrap; gap:8px; padding:10px; border:1px solid #dce4f0; border-radius:12px; }
+.sd-student-picker .sd-member-action { font-size:13px; color:#7c2940; background:#fff8fa; }
+.sd-member-confirm { max-width:min(480px,calc(100vw - 32px)); box-sizing:border-box; border:1px solid #dce4f0; border-radius:18px; padding:24px; color:#142442; background:white; }
+.sd-member-confirm::backdrop { background:rgb(15 27 49 / 45%); }
+.sd-member-confirm p { line-height:1.6; margin-top:0; }
+.sd-member-confirm button { margin:4px; }
 .sd-student-picker button { min-height:44px; max-width:100%; overflow-wrap:anywhere; padding:10px 14px; border:1px solid #a7bbd5; border-radius:10px; color:#142442; background:white; cursor:pointer; }
 .sd-student-picker button:focus-visible { outline:3px solid #087cca; outline-offset:3px; }
 @media(max-width:600px) { .sd-isolated-chat { height:80dvh; } .sd-message-panel { border-radius:12px; } }

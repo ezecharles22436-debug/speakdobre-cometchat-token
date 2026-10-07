@@ -13,6 +13,7 @@ import { createIncomingCalls } from './incoming-calls.mjs';
 import { createOutgoingCalls } from './outgoing-calls.mjs';
 import { mountPreviewCall } from './call-host';
 import { mountStudentPicker } from './student-picker.mjs';
+import { moderateGroupMember } from './member-moderation.mjs';
 import { ReportProvider as CometChatProvider } from './report-provider';
 export { mountPreviewCall } from './call-host';
 export { createStaffTargetClient } from './staff-target-client.mjs';
@@ -59,7 +60,8 @@ export async function mountPreviewChat({ container, appId, getSession, authorize
       if (version !== generation) return;
       if(view.canStartCalls&&view.type==='group'&&authorizeStudent){
         removeStudentPicker=mountStudentPicker(studentPicker,{
-          identity:{uid:CometChatUIKit.getLoggedInUser()?.getUid(),role:view.role},roomGuid:view.id,getSession,authorizeStudent,
+          identity:{uid:CometChatUIKit.getLoggedInUser()?.getUid(),role:view.role},roomGuid:view.id,roomName:entity.group?.getName(),getSession,authorizeStudent,
+          moderateMember:args=>moderateGroupMember({...args,sdk:CometChat,identity:{uid:CometChatUIKit.getLoggedInUser()?.getUid(),role:view.role}}),
           createRequest:(guid:string,limit:number)=>new CometChat.GroupMembersRequestBuilder(guid).setLimit(limit).setScopes(['participant']).build(),
           onSelect:(uid:string,guid:string)=>adapter.open('user',uid,guid),
         });
