@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { CometChat } from '@cometchat/chat-sdk-javascript';
-import { CometChatUIKit, UIKitSettingsBuilder, CometChatLocalize, CometChatProvider,
+import { CometChatUIKit, UIKitSettingsBuilder, CometChatLocalize,
   CometChatMessageHeader, CometChatMessageList, CometChatMessageComposer } from '@cometchat/chat-uikit-react';
 import '@cometchat/chat-uikit-react/styles';
 import './chat.css';
@@ -13,6 +13,7 @@ import { createIncomingCalls } from './incoming-calls.mjs';
 import { createOutgoingCalls } from './outgoing-calls.mjs';
 import { mountPreviewCall } from './call-host';
 import { mountStudentPicker } from './student-picker.mjs';
+import { ReportProvider as CometChatProvider } from './report-provider';
 export { mountPreviewCall } from './call-host';
 export { createStaffTargetClient } from './staff-target-client.mjs';
 
