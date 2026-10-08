@@ -41,5 +41,5 @@ export function createPreviewSessionClient({ pageOrigin, memberstack, fetcher = 
     if (typeof session?.token !== 'string' || !session.token || session.user?.uid !== identity || !roles.has(session.user.role) || !Array.isArray(session.rooms) || !Array.isArray(session.staffContacts)) throw Error('Сервер не підтвердив сеанс чату.');
     return session;
   }
-  return { getSession, getMemberstackToken };
+  return { getSession, getMemberstackToken, checkIdentity: member };
 }

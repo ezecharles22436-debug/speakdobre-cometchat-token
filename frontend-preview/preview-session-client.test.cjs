@@ -33,3 +33,11 @@ test('upstream error content is never shown to students', async () => {
   const f = await fixture({ fetcher: async () => ({ ok: false, status: 500, json: async () => ({ error: 'sensitive upstream detail' }) }) });
   await assert.rejects(f.client.getSession(), error => !error.message.includes('sensitive'));
 });
+
+test('startup identity check uses one member read and no credential or server request', async () => {
+  let reads=0, cookies=0, id='mem_sb_fixture';
+  const f=await fixture({memberstack:{getCurrentMember:async()=>{reads++;return {data:{id}};},getMemberCookie:async()=>{cookies++;return 'synthetic';}}});
+  await f.client.checkIdentity();
+  assert.equal(reads,1);assert.equal(cookies,0);assert.equal(f.requests.length,0);
+  id='mem_sb_other';await assert.rejects(f.client.checkIdentity());
+});

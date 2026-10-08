@@ -4,11 +4,13 @@ export function createStartupSession({ load, checkIdentity, now = Date.now }) {
   let booting = true, pending, started = 0;
   return {
     async getSession() {
-      await checkIdentity();
+      // load validates identity before and after its authenticated request.
+      // Reuse needs one fresh identity read, not another cookie/token workflow.
       if (!booting) return load();
       if (!pending || now() - started >= 10000) {
         started = now();
         pending = Promise.resolve().then(load);
+        return pending;
       }
       const session = await pending;
       await checkIdentity();

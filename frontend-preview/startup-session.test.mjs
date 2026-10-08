@@ -9,7 +9,7 @@ test('sequential and concurrent startup consumers share one authorization', asyn
   assert.equal(sessions[0], sessions[1]);
   assert.equal(await client.getSession(), sessions[0]);
   assert.equal(calls, 1);
-  assert.equal(checks, 6);
+  assert.equal(checks, 2);
 });
 test('all post-startup requests obtain fresh authorization', async () => {
   let calls = 0;

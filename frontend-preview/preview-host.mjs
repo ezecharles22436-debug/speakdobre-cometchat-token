@@ -8,8 +8,8 @@ import { createStartupSession } from './startup-session.mjs';
 export async function mountAuthenticatedPreview({ container, memberstack, roomSelector, roomNavigation }) {
   if (!container || container.ownerDocument.defaultView.location.origin !== 'https://speakdobre.webflow.io') throw Error('Доступна лише тестова сторінка.');
   if (!roomSelector?.createClient || !roomSelector?.mount || !roomNavigation?.mount) throw Error('Не завантажено вибір груп.');
-  const { getSession: loadSession, getMemberstackToken } = createPreviewSessionClient({ pageOrigin: container.ownerDocument.defaultView.location.origin, memberstack });
-  const startup = createStartupSession({ load: loadSession, checkIdentity: getMemberstackToken });
+  const { getSession: loadSession, getMemberstackToken, checkIdentity } = createPreviewSessionClient({ pageOrigin: container.ownerDocument.defaultView.location.origin, memberstack });
+  const startup = createStartupSession({ load: loadSession, checkIdentity });
   const getSession = () => startup.getSession();
   const timingStart = performance.now();
   const timing = phase => {
