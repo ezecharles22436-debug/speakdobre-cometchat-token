@@ -22,15 +22,22 @@ export function createPreviewSessionClient({ pageOrigin, memberstack, fetcher = 
     return token;
   }
   async function getSession() {
+    const timingStart = performance.now();
+    const timing = phase => {
+      if (typeof location !== 'undefined' && location.hostname.endsWith('.webflow.io')) console.info('[SpeakDobre session]', phase, Math.round(performance.now() - timingStart));
+    };
     const token = await getMemberstackToken();
+    timing('identity-ready');
     const response = await fetcher(`${PREVIEW_ORIGIN}/api/cometchat-token`, {
       method: 'POST', credentials: 'omit', cache: 'no-store', redirect: 'error',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: '{}', signal: AbortSignal.timeout(15000),
     });
     if (!response.ok) throw Error(response.status === 403 ? 'Немає доступу до Practice Chat.' : 'Не вдалося перевірити доступ до чату.');
+    timing('server-response');
     const session = await response.json();
     await member();
+    timing('identity-rechecked');
     if (typeof session?.token !== 'string' || !session.token || session.user?.uid !== identity || !roles.has(session.user.role) || !Array.isArray(session.rooms) || !Array.isArray(session.staffContacts)) throw Error('Сервер не підтвердив сеанс чату.');
     return session;
   }
