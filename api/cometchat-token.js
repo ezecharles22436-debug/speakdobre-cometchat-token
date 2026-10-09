@@ -3,6 +3,8 @@ const { roleForMember, ROOMS } = require('./_chat-room-policy');
 const { roomReleaseReady } = require('./_chat-room-release');
 const { createRoomProvider } = require('./_chat-room-provider');
 const { prepareRoomAccess } = require('./_chat-room-staff');
+const { createRoomStore } = require('./_chat-room-store');
+const { startupSelection } = require('./_chat-startup-selection');
 
 function roomRoleForMember(memberId, env = process.env) {
   if (env.CHAT_ROOMS_ENABLED !== 'true') return null;
@@ -67,11 +69,20 @@ module.exports = async function handler(req, res) {
     const uid = member.id;
 
     await ensureCometChatUser(uid, name, role);
-    const roomAccess = role ? await prepareRoomAccess({ uid, role, chat: createRoomProvider() }) : null;
+    const provider = role ? createRoomProvider() : null;
+    const [roomAccess, studentState] = await Promise.all([
+      role ? prepareRoomAccess({ uid, role, chat: provider }) : null,
+      role === 'student' ? (async () => {
+        const memberships = await provider.memberships(uid);
+        const selection = await startupSelection({ uid, memberships, store: createRoomStore() });
+        return { memberships, selection };
+      })() : null,
+    ]);
     await reactivateCometChatUser(uid);
     const token = await createCometChatToken(uid);
-    const rooms = await getVisibleRoomsForUser(uid, roomAccess?.memberships
-      ? { memberships: async () => roomAccess.memberships } : undefined);
+    const memberships = studentState?.memberships || roomAccess?.memberships;
+    const rooms = await getVisibleRoomsForUser(uid, memberships
+      ? { memberships: async () => memberships } : undefined);
 
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
@@ -82,6 +93,7 @@ module.exports = async function handler(req, res) {
         ...(role ? { role } : {})
       },
       rooms,
+      ...(studentState ? { selection: studentState.selection } : {}),
       ...(roomAccess ? { staffContacts: roomAccess.contacts } : {}),
       access: {
         type: access.type,
@@ -245,7 +257,7 @@ async function ensureCometChatUser(uid, name, role = null) {
 
   if (existing) {
     // Never trust a client-editable Memberstack field or a prior provider role.
-    if (role) {
+    if (role && (existing?.data || existing)?.role !== role) {
       const updated = await cometChatRequest(`/users/${encodeURIComponent(uid)}`, {
         method: 'PUT', body: { role }
       });

@@ -5,11 +5,11 @@ import { createStartupSession } from './startup-session.mjs';
 
 // Explicit host entry only; never auto-runs on import. The approved staging embed
 // must load pinned SDK assets first and must NOT run the old widget concurrently.
-export async function mountAuthenticatedPreview({ container, memberstack, roomSelector, roomNavigation }) {
+export async function mountAuthenticatedPreview({ container, memberstack, roomSelector, roomNavigation, sessionClient, startupSession }) {
   if (!container || container.ownerDocument.defaultView.location.origin !== 'https://speakdobre.webflow.io') throw Error('Доступна лише тестова сторінка.');
   if (!roomSelector?.createClient || !roomSelector?.mount || !roomNavigation?.mount) throw Error('Не завантажено вибір груп.');
-  const { getSession: loadSession, getMemberstackToken, checkIdentity } = createPreviewSessionClient({ pageOrigin: container.ownerDocument.defaultView.location.origin, memberstack });
-  const startup = createStartupSession({ load: loadSession, checkIdentity });
+  const { getSession: loadSession, getMemberstackToken, checkIdentity } = sessionClient || createPreviewSessionClient({ pageOrigin: container.ownerDocument.defaultView.location.origin, memberstack });
+  const startup = startupSession || createStartupSession({ load: loadSession, checkIdentity });
   const getSession = () => startup.getSession();
   // Validate account and entitlement before changing the host area or initializing SDK.
   await getSession();
@@ -20,7 +20,11 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
   const selectionClient = roomSelector.createClient({ endpoint: `${PREVIEW_ORIGIN}/api/chat-rooms`, getToken: getMemberstackToken });
   const flow = createPreviewFlow({
     getSession,
-    hasSavedSelection: async () => {
+    hasSavedSelection: async session => {
+      if (session.selection && typeof session.selection.ready === 'boolean' && typeof session.selection.pending === 'boolean') {
+        return session.selection.ready && !session.selection.pending;
+      }
+      // Compatibility with an older backend during staged rollout.
       const saved = await selectionClient.load();
       return saved.pending === false && roomSelector.validSelection(saved.rooms, saved.selected);
     },

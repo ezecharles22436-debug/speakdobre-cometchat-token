@@ -31,7 +31,7 @@ export function createPreviewFlow({ getSession, hasSavedSelection = async () => 
       if (identity || disposed) throw Error('Перевірку вже розпочато.');
       const session = check(await getSession());
       identity = { uid: session.user.uid, role: session.user.role };
-      if (identity.role === 'student' && (chooseGroups || !await hasSavedSelection())) await showSelector({ onReady: open });
+      if (identity.role === 'student' && (chooseGroups || !await hasSavedSelection(session))) await showSelector({ onReady: open });
       else await open();
     },
     async dispose() { disposed = true; await chat?.dispose(); chat = undefined; clear(); },

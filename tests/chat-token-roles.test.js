@@ -29,6 +29,12 @@ test('existing elevated provider role is reset before a student can receive a to
     assert.deepEqual(JSON.parse(calls[1].body), { role: 'student' });
   } finally { global.fetch = original; }
 });
+test('verified matching provider role needs no redundant write', async () => {
+  const original = global.fetch; const calls = [];
+  global.fetch = async (url, options) => { calls.push(options.method); return { ok: true, status: 200, text: async () => JSON.stringify({ data: { role: 'student' } }) }; };
+  try { await ensureCometChatUser('mem_student', 'Synthetic', 'student'); assert.deepEqual(calls, ['GET']); }
+  finally { global.fetch = original; }
+});
 test('provider role mismatch fails closed', async () => {
   const original = global.fetch;
   global.fetch = async () => ({ ok: true, status: 200,

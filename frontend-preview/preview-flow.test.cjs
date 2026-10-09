@@ -21,6 +21,11 @@ test('returning student opens navigation after server verifies saved selection',
   const f = await fixture('student', { hasSavedSelection: async () => true });
   await f.flow.start(); assert.deepEqual(f.events, ['chat','nav','hide']);
 });
+test('selection check receives the authenticated session snapshot', async () => {
+  let seen;
+  const f = await fixture('student', { hasSavedSelection: async session => { seen = session; return true; } });
+  await f.flow.start(); assert.equal(seen, f.session);
+});
 
 test('explicit change-groups intent still opens selector for returning student', async () => {
   const f = await fixture('student', { hasSavedSelection: async () => true });
