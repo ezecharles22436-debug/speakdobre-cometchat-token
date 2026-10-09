@@ -65,6 +65,17 @@ test('incomplete provider writes cannot report successful setup',async()=>{
 test('missing or invalid trusted config fails closed',()=>{
   for(const bad of [{},{CHAT_SUPER_MODERATOR_IDS:'anything'},{CHAT_MODERATOR_IDS:'mem_ok,invalid'}])assert.throws(()=>trustedStaffConfig(bad));
 });
+test('read-only staff verification never repairs missing memberships or ignores a ban',async()=>{
+  for(const mode of ['missing','banned','valid']) {
+    const f=fixture();
+    if(mode!=='missing') f.memberships.push(...ROOMS.map(room=>({guid:room.guid,scope:'moderator'})));
+    if(mode==='banned') f.chat.isBanned=async guid=>guid===ROOMS[0].guid;
+    const run=prepareRoomAccess({uid:'mem_mod',role:'moderator',env,chat:f.chat,readOnly:true});
+    if(mode==='valid') assert.equal((await run).memberships.length,ROOMS.length);
+    else await assert.rejects(run);
+    assert.equal(f.writes.length,0);
+  }
+});
 
 test('returning staff checks bans concurrently with a four-request limit and one membership read',async()=>{
   const f=fixture(); let active=0, peak=0, checks=0, reads=0;

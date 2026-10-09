@@ -8,7 +8,7 @@ test('consolidated student startup checks access once and memberships once; pend
   const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
   Object.assign(process.env, env);
   const originalFetch = global.fetch, originalRead = shared.getDocument;
-  let record = null, deny = false;
+  let record = null, deny = false, deactivated = false, wrongRole = false, missingFriend = false;
   const calls = [];
   shared.getDocument = async path => { assert.match(path, /preview_fixture_chatRoomSelections\/mem_student$/); return record; };
   global.fetch = async (url, options = {}) => {
@@ -16,18 +16,18 @@ test('consolidated student startup checks access once and memberships once; pend
     let data;
     if (path.endsWith('/members/verify-token')) data = { id: 'mem_student' };
     else if (path.endsWith('/members/mem_student')) data = { id: 'mem_student', planConnections: deny ? [] : [{ active: true, planId: 'plan_fixture' }] };
-    else if (path.endsWith('/users/mem_student') && options.method === 'GET') data = { uid: 'mem_student', role: 'student' };
+    else if (path.endsWith('/users/mem_student') && options.method === 'GET') data = { uid: 'mem_student', role: wrongRole ? 'super_moderator' : 'student', ...(deactivated ? { deactivatedAt: 12345 } : {}) };
     else if (path.endsWith('/users/mem_owner')) data = { uid: 'mem_owner', role: 'super_moderator' };
-    else if (path.endsWith('/friends')) data = [{ uid: 'mem_owner', role: 'super_moderator' }];
+    else if (path.endsWith('/friends')) data = missingFriend ? [] : [{ uid: 'mem_owner', role: 'super_moderator' }];
     else if (path.endsWith('/groups')) data = [{ guid: 'speakdobre-c2', hasJoined: true, scope: 'participant' }];
     else if (path.endsWith('/users') && options.method === 'PUT') data = {};
     else if (path.endsWith('/auth_tokens')) data = { authToken: 'synthetic' };
     else throw Error('Unexpected fixture request');
     return new Response(JSON.stringify({ data, meta: { pagination: { total_pages: 1 } } }), { status: 200 });
   };
-  const run = async () => {
+  const run = async (body = {}) => {
     const res = { statusCode: 200, setHeader() {}, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
-    await handler({ method: 'POST', headers: { origin: 'https://speakdobre.webflow.io', authorization: 'Bearer synthetic' } }, res);
+    await handler({ method: 'POST', body, headers: { origin: 'https://speakdobre.webflow.io', authorization: 'Bearer synthetic' } }, res);
     return res;
   };
   try {
@@ -36,7 +36,19 @@ test('consolidated student startup checks access once and memberships once; pend
     assert.equal(calls.filter(c => c.path.endsWith('/groups')).length, 1);
     assert.equal(calls.filter(c => c.path.endsWith('/users/mem_student') && c.method === 'PUT').length, 0);
     record = { state: 'working' }; res = await run(); assert.deepEqual(res.body.selection, { ready: false, pending: true });
-    calls.length = 0; deny = true; res = await run(); assert.equal(res.statusCode, 403);
+    record = null; calls.length = 0;
+    res = await run({ operation: 'verify' }); assert.equal(res.statusCode, 200);
+    assert.equal(res.body.verified, true); assert.equal('token' in res.body, false);
+    assert.equal(calls.filter(c => c.path.endsWith('/groups')).length, 1);
+    assert.equal(calls.some(c => c.path.includes('/v3/') && c.method !== 'GET'), false);
+    for (const condition of ['deactivated', 'role', 'friends']) {
+      deactivated = condition === 'deactivated'; wrongRole = condition === 'role'; missingFriend = condition === 'friends'; calls.length = 0;
+      res = await run({ operation: 'verify' }); assert.notEqual(res.statusCode, 200);
+      assert.equal(calls.some(c => c.path.includes('/v3/') && c.method !== 'GET'), false);
+    }
+    deactivated = wrongRole = missingFriend = false;
+    assert.equal((await run({ operation: 'unknown' })).statusCode, 400);
+    calls.length = 0; deny = true; res = await run({ operation: 'verify' }); assert.equal(res.statusCode, 403);
     assert.equal(calls.some(c => c.path.includes('/v3/')), false);
   } finally {
     global.fetch = originalFetch; shared.getDocument = originalRead;

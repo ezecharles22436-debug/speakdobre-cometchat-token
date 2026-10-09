@@ -32,6 +32,12 @@ module.exports = async function handler(req, res) {
   try {
     assertEnvironment();
     assertAllowedOrigin(req);
+    let body;
+    try { body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {}); }
+    catch { throw new HttpError(400, 'Invalid request.'); }
+    if (!body || Array.isArray(body) || typeof body !== 'object' || Object.keys(body).some(key => key !== 'operation') ||
+        (body.operation !== undefined && body.operation !== 'verify')) throw new HttpError(400, 'Invalid request.');
+    const readOnly = body.operation === 'verify';
 
     const sessionToken = readBearerToken(req.headers.authorization);
     if (!sessionToken) {
@@ -51,6 +57,7 @@ module.exports = async function handler(req, res) {
     }
 
     const role = roomRoleForMember(memberId);
+    if (readOnly && !role) throw new HttpError(503, 'Verification unavailable.');
     const access = role && role !== 'student'
       ? { allowed: true, type: 'staff', trialEnd: null }
       : getPracticeChatAccess(member);
@@ -68,25 +75,28 @@ module.exports = async function handler(req, res) {
     const name = cleanText(`${firstName} ${lastName}`.trim() || email || "SpeakDobre Member", 100);
     const uid = member.id;
 
-    await ensureCometChatUser(uid, name, role);
+    if (!readOnly) await ensureCometChatUser(uid, name, role);
     const provider = role ? createRoomProvider() : null;
     const [roomAccess, studentState] = await Promise.all([
-      role ? prepareRoomAccess({ uid, role, chat: provider }) : null,
+      role ? prepareRoomAccess({ uid, role, chat: provider, readOnly }) : null,
       role === 'student' ? (async () => {
         const memberships = await provider.memberships(uid);
         const selection = await startupSelection({ uid, memberships, store: createRoomStore() });
         return { memberships, selection };
       })() : null,
     ]);
-    await reactivateCometChatUser(uid);
-    const token = await createCometChatToken(uid);
+    let token;
+    if (!readOnly) {
+      await reactivateCometChatUser(uid);
+      token = await createCometChatToken(uid);
+    }
     const memberships = studentState?.memberships || roomAccess?.memberships;
     const rooms = await getVisibleRoomsForUser(uid, memberships
       ? { memberships: async () => memberships } : undefined);
 
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
-      token,
+      ...(readOnly ? { verified: true } : { token }),
       user: {
         uid,
         name,

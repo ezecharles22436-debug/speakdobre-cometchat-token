@@ -33,6 +33,26 @@ test('upstream error content is never shown to students', async () => {
   const f = await fixture({ fetcher: async () => ({ ok: false, status: 500, json: async () => ({ error: 'sensitive upstream detail' }) }) });
   await assert.rejects(f.client.getSession(), error => !error.message.includes('sensitive'));
 });
+test('later checks reuse only SDK token, with fresh server role and memberships', async () => {
+  let count = 0;
+  const f = await fixture({ fetcher: async (url, options) => {
+    count++;
+    assert.deepEqual(JSON.parse(options.body), count === 1 ? {} : { operation: 'verify' });
+    return { ok: true, json: async () => ({ ...(count === 1 ? { token: 'synthetic' } : { verified: true }), user: { uid: 'mem_sb_fixture', role: 'student' }, rooms: count === 1 ? [{ guid: 'c2', unlocked: true }] : [], staffContacts: [] }) };
+  } });
+  await f.client.getSession(); const fresh = await f.client.getSession();
+  assert.equal(fresh.token, 'synthetic'); assert.deepEqual(fresh.rooms, []);
+});
+test('verification cannot fall back to old access when denied, malformed or role changed', async () => {
+  for (const invalid of [{ verified: false }, { verified: true, user: { uid: 'mem_sb_fixture', role: 'moderator' } }, { verified: true, user: { uid: 'mem_sb_other', role: 'student' } }, null]) {
+    let count = 0;
+    const f = await fixture({ fetcher: async () => {
+      if (++count === 1) return { ok: true, json: async () => ({ token: 'synthetic', user: { uid: 'mem_sb_fixture', role: 'student' }, rooms: [], staffContacts: [] }) };
+      return invalid === null ? { ok: false, status: 403 } : { ok: true, json: async () => invalid };
+    } });
+    await f.client.getSession(); await assert.rejects(f.client.getSession());
+  }
+});
 
 test('startup identity check uses one member read and no credential or server request', async () => {
   let reads=0, cookies=0, id='mem_sb_fixture';

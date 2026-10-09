@@ -19,27 +19,28 @@ function trustedStaffConfig(env = process.env) {
 
 // Called only after authentication, entitlement and server role verification.
 // No customer enumeration, role reassignment, automatic unbanning or removal.
-async function prepareRoomAccess({ uid, role, chat, env = process.env }) {
+async function prepareRoomAccess({ uid, role, chat, env = process.env, readOnly = false }) {
   const { config, ids } = trustedStaffConfig(env);
   if (roleForMember(uid, config) !== role) throw new Error('Untrusted room role');
   const actor = await chat.user(uid);
   if (actor.role !== role) throw new Error('Provider role mismatch');
+  if (readOnly && actor.deactivatedAt) throw new Error('Provider account deactivated');
   if (role === 'student') {
     // Validate every contact before any write. A stale/demoted staff ID cannot
     // accidentally become an allowed peer-history friendship.
-    await checkInBatches(ids, async id => {
+    const [before] = await Promise.all([chat.friends(uid), checkInBatches(ids, async id => {
       const staff = await chat.user(id);
       if (staff.role !== roleForMember(id, config)) throw new Error('Staff role mismatch');
-    });
+    })]);
     const checkFriends = rows => {
       if (rows.some(row => !ids.includes(row.uid) || row.role !== roleForMember(row.uid, config))) {
         throw new Error('Unexpected private contacts require review');
       }
     };
-    const before = await chat.friends(uid);
     checkFriends(before);
     const missing = ids.filter(id => !before.some(row => row.uid === id));
     if (!missing.length) return { contacts: ids };
+    if (readOnly) throw new Error('Staff contacts require setup');
     await chat.addFriends(uid, missing);
     const after = await chat.friends(uid);
     checkFriends(after);
@@ -59,6 +60,7 @@ async function prepareRoomAccess({ uid, role, chat, env = process.env }) {
   if (ROOMS.every(room => before.some(row => row.guid === room.guid))) {
     return { contacts: [], memberships: before };
   }
+  if (readOnly) throw new Error('Staff memberships require setup');
   for (const room of ROOMS) {
     if (!before.some(row => row.guid === room.guid)) await chat.addStaff(room.guid, uid, scope);
   }
