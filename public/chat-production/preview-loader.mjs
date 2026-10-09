@@ -1,3 +1,5 @@
+import { createPreviewSessionClient } from './preview-session-client.mjs';
+import { createStartupSession } from './startup-session.mjs';
 const BASE = new URL('./', import.meta.url);
 const ORIGIN = 'https://speakdobre-cometchat-token.vercel.app';
 export function waitForChatAsset(doc, element, timeoutMs = 15000) {
@@ -14,6 +16,11 @@ export function waitForChatAsset(doc, element, timeoutMs = 15000) {
 }
 export async function startSpeakDobrePreview({ container, memberstack }) {
   if (location.origin !== 'https://www.speakdobre.com' || BASE.origin !== ORIGIN) throw Error('Неправильна конфігурація чату.');
+  const sessionClient = createPreviewSessionClient({ pageOrigin: location.origin, memberstack });
+  const startupSession = createStartupSession({ load: sessionClient.getSession, checkIdentity: sessionClient.checkIdentity });
+  // Observe rejection immediately while public assets download in parallel.
+  const authorization = startupSession.getSession().then(value => ({ value }), error => ({ error }));
+  try {
   const response = await fetch(new URL('preview-manifest.json', BASE), { credentials: 'omit', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw Error('Не вдалося завантажити пакет чату.');
   const manifest = await response.json();
@@ -37,5 +44,9 @@ export async function startSpeakDobrePreview({ container, memberstack }) {
     window.SpeakDobreRoomNavigation ? Promise.resolve() : script('../chat-room-navigation.js'),
   ]);
   const { mountAuthenticatedPreview } = await import(asset(manifest.entry));
-  return mountAuthenticatedPreview({ container, memberstack, roomSelector: window.SpeakDobreRoomSelector, roomNavigation: window.SpeakDobreRoomNavigation });
+  const authorized = await authorization;
+  if (authorized.error) throw authorized.error;
+  const result = await mountAuthenticatedPreview({ container, memberstack, roomSelector: window.SpeakDobreRoomSelector, roomNavigation: window.SpeakDobreRoomNavigation, sessionClient, startupSession });
+  return result;
+  } finally { startupSession.finish(); }
 }
