@@ -7,6 +7,16 @@
 .sd-incoming-offer button { min-height:44px; margin:4px; padding:10px 16px; border:1px solid #9eb3cf; border-radius:10px; background:white; color:#142442; }
 .sd-call-media { min-height:280px; height:55dvh; }
 .sd-student-picker:empty { display:none; }
+.sd-staff-management { margin-block:0 16px; color:#142442; font-family:Arial,sans-serif; }
+.sd-staff-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 16px; background:#f4f7ff; border:1px solid #dce4f0; border-radius:14px; }
+.sd-staff-badge { font-size:13px; font-weight:700; color:#41577d; }
+.sd-staff-management button { min-height:44px; padding:10px 16px; border:1px solid #a7bbd5; border-radius:10px; color:#142442; background:white; cursor:pointer; }
+.sd-staff-management button:focus-visible { outline:3px solid #087cca; outline-offset:3px; }
+.sd-staff-management>section { margin-top:10px; padding:20px; border:1px solid #dce4f0; border-radius:16px; background:white; }
+.sd-staff-management>section[hidden] { display:none; }
+.sd-staff-management h2 { margin:0 0 10px; font-size:22px; }
+.sd-staff-management p { color:#526582; line-height:1.6; }
+@media(max-width:600px) { .sd-staff-toolbar { flex-wrap:wrap; } .sd-staff-management>section { padding:14px; } }
 .sd-student-picker { padding:16px; border:1px solid #dce4f0; border-radius:16px; background:#f8faff; margin-block:12px; }
 .sd-student-picker h3 { margin:0 0 12px; font-size:18px; }
 .sd-student-list { display:flex; gap:8px; flex-wrap:wrap; }

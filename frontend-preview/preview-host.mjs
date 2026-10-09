@@ -2,6 +2,7 @@ import { mountPreviewChat, createStaffTargetClient } from './chat.tsx';
 import { createPreviewSessionClient, PREVIEW_ORIGIN } from './preview-session-client.mjs';
 import { createPreviewFlow } from './preview-flow.mjs';
 import { createStartupSession } from './startup-session.mjs';
+import { mountStaffManagement } from './staff-management.mjs';
 
 // Explicit host entry only; never auto-runs on import. The approved staging embed
 // must load pinned SDK assets first and must NOT run the old widget concurrently.
@@ -14,8 +15,9 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
   // Validate account and entitlement before changing the host area or initializing SDK.
   const verifiedSession = await getSession();
   const doc = container.ownerDocument;
-  const picker = doc.createElement('section'), rail = doc.createElement('nav'), chat = doc.createElement('div');
-  container.replaceChildren(picker, rail, chat);
+  const staffRoot = doc.createElement('div'), picker = doc.createElement('section'), rail = doc.createElement('nav'), chat = doc.createElement('div');
+  container.replaceChildren(staffRoot, picker, rail, chat);
+  const staffManagement = mountStaffManagement(staffRoot, { identity: verifiedSession.user, getSession });
   const authorizeStudent = createStaffTargetClient({ endpoint: `${PREVIEW_ORIGIN}/api/chat-staff-target`, getMemberstackToken });
   const selectionClient = roomSelector.createClient({ endpoint: `${PREVIEW_ORIGIN}/api/chat-rooms`, getToken: getMemberstackToken });
   const flow = createPreviewFlow({
@@ -33,9 +35,9 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
       picker.hidden = true;
       if (doc.defaultView.location.hash === '#choose-groups') doc.defaultView.history.replaceState(null, '', doc.defaultView.location.pathname + doc.defaultView.location.search);
     },
-    mountChat: () => mountPreviewChat({ container: chat, appId: '168437005e7f6fa2a', getSession, authorizeStudent }),
+    mountChat: () => mountPreviewChat({ container: chat, appId: '168437005e7f6fa2a', getSession, authorizeStudent, staffManagement }),
     mountNavigation: options => roomNavigation.mount({ ...options, root: rail, onChangeGroups: () => { doc.defaultView.location.hash = 'choose-groups'; doc.defaultView.location.reload(); } }),
-    clear: () => { container.replaceChildren(); },
+    clear: () => { staffManagement?.dispose(); container.replaceChildren(); },
   });
   try { await flow.start({ chooseGroups: doc.defaultView.location.hash === '#choose-groups', verifiedSession }); return flow; }
   catch (error) { await flow.dispose(); throw error; }

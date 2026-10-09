@@ -23,9 +23,10 @@ type View = { type: 'group' | 'user'; id: string; role: string; canStartCalls: b
 
 // Isolated integration entry point, not imported by Webflow. No automatic login.
 // The host must retain the existing server-confirmed group selector before mounting.
-export async function mountPreviewChat({ container, appId, getSession, authorizeStudent }: {
+export async function mountPreviewChat({ container, appId, getSession, authorizeStudent, staffManagement }: {
   container: HTMLElement; appId: string; getSession: () => Promise<Session>;
   authorizeStudent?: (target:{uid:string;roomGuid:string}) => Promise<any>;
+  staffManagement?: {content:HTMLElement;clear:()=>void;setGroup:(name:string)=>void} | null;
 }) {
   if (appId !== '168437005e7f6fa2a') throw Error('Доступна лише ізольована версія чату.');
   await CometChatUIKit.init(new UIKitSettingsBuilder().setAppId(appId).setRegion('eu').setCallingEnabled(true).build());
@@ -45,6 +46,7 @@ export async function mountPreviewChat({ container, appId, getSession, authorize
   let removeStudentPicker: (()=>void) | undefined;
   const clear = () => {
     removeStudentPicker?.();removeStudentPicker=undefined;
+    staffManagement?.clear();
     generation++; incoming?.dispose(); incoming=undefined; activeCall?.dispose(); activeCall=undefined;
     if(outgoing){const previous=outgoing;outgoing=undefined;void previous.cancel().catch(()=>{});previous.dispose();}
     root.render(<p role="status">Оберіть групу або зверніться до модератора.</p>);
@@ -59,7 +61,8 @@ export async function mountPreviewChat({ container, appId, getSession, authorize
       const entity = view.type === 'group' ? { group: await CometChat.getGroup(view.id) } : { user: await CometChat.getUser(view.id) };
       if (version !== generation) return;
       if(view.canStartCalls&&view.type==='group'&&authorizeStudent){
-        removeStudentPicker=mountStudentPicker(studentPicker,{
+        staffManagement?.setGroup(entity.group?.getName() || view.id);
+        removeStudentPicker=mountStudentPicker(staffManagement?.content || studentPicker,{
           identity:{uid:CometChatUIKit.getLoggedInUser()?.getUid(),role:view.role},roomGuid:view.id,roomName:entity.group?.getName(),getSession,authorizeStudent,
           moderateMember:args=>moderateGroupMember({...args,sdk:CometChat,identity:{uid:CometChatUIKit.getLoggedInUser()?.getUid(),role:view.role}}),
           createRequest:(guid:string,limit:number)=>new CometChat.GroupMembersRequestBuilder(guid).setLimit(limit).setScopes(['participant']).build(),
