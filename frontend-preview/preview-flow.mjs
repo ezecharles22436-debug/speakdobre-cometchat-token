@@ -17,8 +17,8 @@ export function createPreviewFlow({ getSession, hasSavedSelection = async () => 
       chat = mounted;
       const fresh = check(await getSession());
       await mountNavigation({ session: fresh, getSession: async () => check(await getSession()), app: {
-        chatWithGroup: id => chat.open('group', id),
-        chatWithUser: id => chat.open('user', id),
+        chatWithGroup: (id, verified) => chat.open('group', id, undefined, verified ? check(verified) : undefined),
+        chatWithUser: (id, verified) => chat.open('user', id, undefined, verified ? check(verified) : undefined),
       } });
       if (disposed) return false;
       hideSelector(); ready = true; return true;

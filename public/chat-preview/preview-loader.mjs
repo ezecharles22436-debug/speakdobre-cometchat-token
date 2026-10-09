@@ -1,5 +1,6 @@
 import { createPreviewSessionClient } from './preview-session-client.mjs';
 import { createStartupSession } from './startup-session.mjs';
+import { phaseTimer } from './startup-timing.mjs';
 const BASE = new URL('./', import.meta.url);
 const ORIGIN = 'https://speakdobre-cometchat-git-db9a07-ezecharles22436-4127s-projects.vercel.app';
 export function waitForChatAsset(doc, element, timeoutMs = 15000) {
@@ -21,9 +22,12 @@ export async function startSpeakDobrePreview({ container, memberstack }) {
   // Observe rejection immediately while public assets download in parallel.
   const authorization = startupSession.getSession().then(value => ({ value }), error => ({ error }));
   try {
+  const manifestDone = phaseTimer('manifest');
   const response = await fetch(new URL('preview-manifest.json', BASE), { credentials: 'omit', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw Error('Не вдалося завантажити пакет чату.');
   const manifest = await response.json();
+  manifestDone();
+  const assetsDone = phaseTimer('assets');
   const asset = name => {
     if (typeof name !== 'string' || !/^assets\/[A-Za-z0-9_.-]+$/.test(name)) throw Error('Некоректний пакет чату.');
     return new URL(name, BASE).href;
@@ -43,9 +47,15 @@ export async function startSpeakDobrePreview({ container, memberstack }) {
     window.SpeakDobreRoomSelector ? Promise.resolve() : script('../chat-room-selector.js'),
     window.SpeakDobreRoomNavigation ? Promise.resolve() : script('../chat-room-navigation.js'),
   ]);
+  assetsDone();
+  const interfaceDone = phaseTimer('interface');
   const { mountAuthenticatedPreview } = await import(asset(manifest.entry));
+  interfaceDone();
   const authorized = await authorization;
   if (authorized.error) throw authorized.error;
-  return await mountAuthenticatedPreview({ container, memberstack, roomSelector: window.SpeakDobreRoomSelector, roomNavigation: window.SpeakDobreRoomNavigation, sessionClient, startupSession });
+  const navigationDone = phaseTimer('navigation');
+  const result = await mountAuthenticatedPreview({ container, memberstack, roomSelector: window.SpeakDobreRoomSelector, roomNavigation: window.SpeakDobreRoomNavigation, sessionClient, startupSession });
+  navigationDone();
+  return result;
   } finally { startupSession.finish(); }
 }

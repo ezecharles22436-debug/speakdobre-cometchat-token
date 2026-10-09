@@ -28,14 +28,17 @@ function createSessionAdapter({ getSession, sdk, render, clear, authorizeStudent
     const result=await authorizeStudent({uid:id,roomGuid});
     return result?.actor?.uid===session.user.uid&&result.actor.role===session.user.role&&result.target?.uid===id&&result.roomGuid===roomGuid;
   }
-  async function open(type, id, roomGuid) {
+  async function open(type, id, roomGuid, navigationSession) {
     if (disposed) throw Error('Сеанс чату завершено.');
     if (busy) return false;
     busy = true;
     // Remove the old message view before awaiting entitlement checks.
     clear();
     try {
-      const session = check(await getSession());
+      // Navigation just performed the same authenticated request for this click.
+      // Reuse only its argument, never persist it for another action. The fresh
+      // post-login check below remains mandatory before rendering any messages.
+      const session = check(navigationSession || await getSession());
       const allowed = await allowedFor(session,type,id,roomGuid);
       if (typeof id !== 'string' || !allowed) throw Error('Цей чат недоступний.');
       // Never reuse a cached SDK login without comparing its identity.

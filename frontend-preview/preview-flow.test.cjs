@@ -10,7 +10,7 @@ async function fixture(role = 'student', overrides = {}) {
 test('student cannot mount chat until server-backed selector signals readiness', async () => {
   const f = await fixture(); await f.flow.start(); assert.deepEqual(f.events, ['selector']);
   await f.selector().onReady(); assert.deepEqual(f.events, ['selector','chat','nav','hide']);
-  await f.navigation().app.chatWithGroup('c2'); assert.deepEqual(f.events.at(-1), ['group','c2']);
+  await f.navigation().app.chatWithGroup('c2'); assert.deepEqual(f.events.at(-1), ['group','c2',undefined,undefined]);
   assert.equal(await f.selector().onReady(), false);
 });
 test('staff bypass selector but never auto-open a conversation', async () => {

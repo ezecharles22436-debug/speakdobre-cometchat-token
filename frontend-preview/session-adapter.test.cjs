@@ -22,6 +22,20 @@ test('peer users, unjoined groups and unknown routes never log in or render', as
     assert.equal(f.rendered.length, 0); assert.ok(!f.events.includes('login'));
   }
 });
+test('navigation authorization is reused only for this action; post-login access is still fresh', async () => {
+  let reads = 0;
+  const f = fixture(async () => { reads++; return session(); });
+  await f.adapter.open('group', 'c2', undefined, session());
+  assert.equal(reads, 1);
+  await f.adapter.open('group', 'c2'); assert.equal(reads, 3);
+});
+test('navigation snapshot cannot bypass revocation during SDK login', async () => {
+  for (const mutate of [s => { s.user.uid = 'other'; }, s => { s.user.role = 'moderator'; }, s => { s.rooms = []; }]) {
+    const f = fixture(async () => { const s = session(); mutate(s); return s; });
+    await assert.rejects(f.adapter.open('group', 'c2', undefined, session()));
+    assert.equal(f.rendered.length, 0); assert.ok(f.events.includes('logout'));
+  }
+});
 test('expired access clears view and logs out', async () => {
   const f = fixture(async () => { throw Error('expired'); });
   await assert.rejects(f.adapter.open('group', 'c2')); assert.equal(f.events[0], 'clear'); assert.ok(f.events.includes('logout'));

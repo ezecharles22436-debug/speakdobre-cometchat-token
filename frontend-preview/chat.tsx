@@ -1,4 +1,5 @@
 import React from 'react';
+import { phaseTimer } from './startup-timing.mjs';
 import { createRoot } from 'react-dom/client';
 import { CometChat } from '@cometchat/chat-sdk-javascript';
 import { CometChatUIKit, UIKitSettingsBuilder, CometChatLocalize,
@@ -52,11 +53,21 @@ export async function mountPreviewChat({ container, appId, getSession, authorize
   const adapter = createSessionAdapter({
     getSession,
     authorizeStudent,
-    sdk: CometChatUIKit,
+    sdk: {
+      getLoggedInUser: () => CometChatUIKit.getLoggedInUser(),
+      logout: () => CometChatUIKit.logout(),
+      loginWithAuthToken: async (token: string) => {
+        const done = phaseTimer('sdk-login');
+        try { return await CometChatUIKit.loginWithAuthToken(token); }
+        finally { done(); }
+      },
+    },
     clear,
     async render(view: View) {
+      const done = phaseTimer('group-render');
       const version = generation;
       const entity = view.type === 'group' ? { group: await CometChat.getGroup(view.id) } : { user: await CometChat.getUser(view.id) };
+      done();
       if (version !== generation) return;
       if(view.canStartCalls&&view.type==='group'&&authorizeStudent){
         removeStudentPicker=mountStudentPicker(studentPicker,{

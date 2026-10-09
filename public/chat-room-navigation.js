@@ -21,8 +21,8 @@
           ? fresh.rooms?.some(room=>room.guid===id&&room.unlocked===true)
           : fresh.staffContacts?.includes(id);
         if(!allowed)throw Error('Цей чат недоступний. Оновіть список груп.');
-        if(type==='group')await app.chatWithGroup(id);
-        else await app.chatWithUser(id);
+        if(type==='group')await app.chatWithGroup(id,fresh);
+        else await app.chatWithUser(id,fresh);
         return true;
       }finally{busy=false;}
     };

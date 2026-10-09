@@ -11,6 +11,11 @@ test('room rail opens verified joined groups and staff contacts',async()=>{
   const f=setup();await f.open('group','level');await f.open('user','mem_mod');
   assert.deepEqual(f.calls,[['group','level'],['user','mem_mod']]);
 });
+test('rail passes its fresh authorization directly to the chat action',async()=>{
+  let seen;
+  const open=createNavigator({session,getSession:async()=>session,app:{chatWithGroup:async(id,verified)=>{seen=verified;}}});
+  await open('group','level');assert.equal(seen,session);
+});
 test('rail rejects peer users and unjoined rooms without calling embed',async()=>{
   const f=setup();await assert.rejects(f.open('user','mem_peer'));await assert.rejects(f.open('group','other'));assert.deepEqual(f.calls,[]);
 });
