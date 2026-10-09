@@ -24,7 +24,13 @@ export function createPreviewSessionClient({ pageOrigin, memberstack, fetcher = 
   }
   async function getSession() {
     const credential = issued;
-    const token = await getMemberstackToken();
+    // Keep the stricter standalone credential helper for selector/staff writes.
+    // Session responses are not exposed until both account and token are checked
+    // again. A second profile read immediately after a synchronous cookie read
+    // adds a round trip without strengthening the final identity binding.
+    await member('member-before-cookie');
+    const token = await timeClientStep('cookie', () => memberstack.getMemberCookie());
+    if (typeof token !== 'string' || !token) throw Error('Увійдіть до тестового акаунта.');
     const response = await timeClientStep('request', () => fetcher(`${PREVIEW_ORIGIN}/api/cometchat-token`, {
       method: 'POST', credentials: 'omit', cache: 'no-store', redirect: 'error',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -33,6 +39,7 @@ export function createPreviewSessionClient({ pageOrigin, memberstack, fetcher = 
     if (!response.ok) throw Error(response.status === 403 ? 'Немає доступу до Practice Chat.' : 'Не вдалося перевірити доступ до чату.');
     let session = await timeClientStep('response-json', () => response.json());
     await member('member-after-request');
+    if (await memberstack.getMemberCookie() !== token) throw Error('Сеанс змінився. Оновіть сторінку.');
     if (credential) {
       if (session?.verified !== true || session.user?.uid !== credential.uid || session.user?.role !== credential.role) throw Error('Сеанс змінився. Оновіть сторінку.');
       // Reuse only the SDK credential, never cached entitlement or memberships.

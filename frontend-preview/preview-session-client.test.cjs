@@ -19,10 +19,33 @@ test('production page or live member cannot request Preview session', async () =
   const f = await fixture({ memberstack: { getCurrentMember: async () => ({ data: { id: 'mem_live' } }) } });
   await assert.rejects(f.client.getSession()); assert.equal(f.requests.length, 0);
 });
-test('account change during cookie retrieval never transmits token', async () => {
+test('standalone credential helper rejects account change before selector or staff writes', async () => {
   let reads = 0;
   const f = await fixture({ memberstack: { getCurrentMember: async () => ({ data: { id: ++reads === 1 ? 'mem_sb_fixture' : 'mem_sb_other' } }), getMemberCookie: async () => 'synthetic' } });
-  await assert.rejects(f.client.getSession()); assert.equal(f.requests.length, 0);
+  await assert.rejects(f.client.getMemberstackToken()); assert.equal(f.requests.length, 0);
+});
+
+test('session uses two fresh profile reads and rejects account change before exposing response', async () => {
+  for (const changed of [false, true]) {
+    let reads = 0;
+    const f = await fixture({ memberstack: {
+      getCurrentMember: async () => ({ data: { id: ++reads > 1 && changed ? 'mem_sb_other' : 'mem_sb_fixture' } }),
+      getMemberCookie: async () => 'synthetic'
+    } });
+    if (changed) await assert.rejects(f.client.getSession()); else await f.client.getSession();
+    assert.equal(reads, 2); assert.equal(f.requests.length, 1);
+  }
+});
+
+test('logout and credential rotation during request never expose the session', async () => {
+  for (const next of [null, '', 'rotated-synthetic']) {
+    let cookieReads = 0;
+    const f = await fixture({ memberstack: {
+      getCurrentMember: async () => ({ data: { id: 'mem_sb_fixture' } }),
+      getMemberCookie: async () => ++cookieReads === 1 ? 'synthetic' : next
+    } });
+    await assert.rejects(f.client.getSession(), /Сеанс змінився/);
+  }
 });
 test('foreign server identity or unknown role is rejected', async () => {
   for (const mutate of [s => { s.user.uid = 'mem_sb_other'; }, s => { s.user.role = 'unknown'; }, s => { s.staffContacts = null; }]) {
