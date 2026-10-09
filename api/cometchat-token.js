@@ -5,7 +5,7 @@ const { createRoomProvider } = require('./_chat-room-provider');
 const { prepareRoomAccess } = require('./_chat-room-staff');
 const { createRoomStore } = require('./_chat-room-store');
 const { startupSelection } = require('./_chat-startup-selection');
-const { verifyIssuedChatAccess } = require('./_chat-suspension');
+const { assertChatAccess, verifyIssuedChatAccess } = require('./_chat-suspension');
 
 function roomRoleForMember(memberId, env = process.env) {
   if (env.CHAT_ROOMS_ENABLED !== 'true') return null;
@@ -76,8 +76,16 @@ module.exports = async function handler(req, res) {
     const name = cleanText(`${firstName} ${lastName}`.trim() || email || "SpeakDobre Member", 100);
     const uid = member.id;
 
+    // Check the durable restriction before any provider mutation. A restored
+    // student still needs a valid plan (checked above), then reactivation must
+    // precede on-behalf-of membership requests for a deactivated provider user.
+    if (role === 'student') assertChatAccess(await createRoomStore().read(uid));
     if (!readOnly) await ensureCometChatUser(uid, name, role);
     const provider = role ? createRoomProvider() : null;
+    if (!readOnly && role === 'student') {
+      await reactivateCometChatUser(uid);
+      await verifyIssuedChatAccess({store:createRoomStore(),chat:provider,uid});
+    }
     const [roomAccess, studentState] = await Promise.all([
       role ? prepareRoomAccess({ uid, role, chat: provider, readOnly }) : null,
       role === 'student' ? (async () => {
@@ -88,7 +96,7 @@ module.exports = async function handler(req, res) {
     ]);
     let token;
     if (!readOnly) {
-      await reactivateCometChatUser(uid);
+      if (role !== 'student') await reactivateCometChatUser(uid);
       token = await createCometChatToken(uid);
       if (role === 'student') {
         // Revoke late tokens if suspension started during issuance, or if

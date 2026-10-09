@@ -19,8 +19,11 @@ test('consolidated student startup checks access once and memberships once; pend
     else if (path.endsWith('/users/mem_student') && options.method === 'GET') data = { uid: 'mem_student', role: wrongRole ? 'super_moderator' : 'student', ...(deactivated ? { deactivatedAt: 12345 } : {}) };
     else if (path.endsWith('/users/mem_owner')) data = { uid: 'mem_owner', role: 'super_moderator' };
     else if (path.endsWith('/friends')) data = missingFriend ? [] : [{ uid: 'mem_owner', role: 'super_moderator' }];
-    else if (path.endsWith('/groups')) data = [{ guid: 'speakdobre-c2', hasJoined: true, scope: 'participant' }];
-    else if (path.endsWith('/users') && options.method === 'PUT') data = {};
+    else if (path.endsWith('/groups')) {
+      if(deactivated)return new Response('{}',{status:403});
+      data = [{ guid: 'speakdobre-c2', hasJoined: true, scope: 'participant' }];
+    }
+    else if (path.endsWith('/users') && options.method === 'PUT') {deactivated=false; data = {};}
     else if (path.endsWith('/auth_tokens')) data = { authToken: 'synthetic' };
     else throw Error('Unexpected fixture request');
     return new Response(JSON.stringify({ data, meta: { pagination: { total_pages: 1 } } }), { status: 200 });
@@ -47,6 +50,15 @@ test('consolidated student startup checks access once and memberships once; pend
       assert.equal(calls.some(c => c.path.includes('/v3/') && c.method !== 'GET'), false);
     }
     deactivated = wrongRole = missingFriend = false;
+    // Regression: restoration clears our restriction, not provider deactivation.
+    record={state:'idle',accessState:'active'};deactivated=true;calls.length=0;
+    res=await run();assert.equal(res.statusCode,200);assert.equal(deactivated,false);
+    const activate=calls.findIndex(c=>c.path.endsWith('/users')&&c.method==='PUT');
+    assert.ok(activate>=0&&activate<calls.findIndex(c=>c.path.endsWith('/groups')));
+    record={state:'idle',accessState:'suspended'};calls.length=0;
+    res=await run();assert.equal(res.statusCode,403);assert.equal(res.body.code,'CHAT_SUSPENDED');
+    assert.equal(calls.some(c=>c.path.includes('/v3/')),false);
+    record=null;
     assert.equal((await run({ operation: 'unknown' })).statusCode, 400);
     calls.length = 0; deny = true; res = await run({ operation: 'verify' }); assert.equal(res.statusCode, 403);
     assert.equal(calls.some(c => c.path.includes('/v3/')), false);
