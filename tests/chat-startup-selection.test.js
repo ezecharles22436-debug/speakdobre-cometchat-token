@@ -2,6 +2,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { startupSelection } = require('../api/_chat-startup-selection');
 const check = (ids, record) => startupSelection({ uid: 'mem_fixture', memberships: ids.map(guid => ({ guid })), store: { read: async uid => { assert.equal(uid, 'mem_fixture'); return record; } } });
+
+test('suspension blocks startup despite valid joined groups', async () => {
+  for (const accessState of ['suspended','revoking','restoring']) {
+    await assert.rejects(check(['speakdobre-c2'], {state:'idle',accessState}), error => error.code === 'CHAT_SUSPENDED');
+  }
+});
 test('startup accepts verified memberships, not saved preferences', async () => {
   assert.deepEqual(await check(['speakdobre-c2', 'speakdobre-travel'], null), { ready: true, pending: false });
   assert.deepEqual(await check([], { state: 'idle', selected: ['speakdobre-c2'] }), { ready: false, pending: false });

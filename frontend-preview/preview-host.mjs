@@ -3,6 +3,7 @@ import { createPreviewSessionClient, PREVIEW_ORIGIN } from './preview-session-cl
 import { createPreviewFlow } from './preview-flow.mjs';
 import { createStartupSession } from './startup-session.mjs';
 import { mountStaffManagement } from './staff-management.mjs';
+import { createOwnerAccessClient } from './owner-access.mjs';
 
 // Explicit host entry only; never auto-runs on import. The approved staging embed
 // must load pinned SDK assets first and must NOT run the old widget concurrently.
@@ -17,7 +18,9 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
   const doc = container.ownerDocument;
   const staffRoot = doc.createElement('div'), picker = doc.createElement('section'), rail = doc.createElement('nav'), chat = doc.createElement('div');
   container.replaceChildren(staffRoot, picker, rail, chat);
-  const staffManagement = mountStaffManagement(staffRoot, { identity: verifiedSession.user, getSession });
+  const ownerAccess = verifiedSession.user.role === 'super_moderator'
+    ? createOwnerAccessClient({endpoint:`${PREVIEW_ORIGIN}/api/chat-owner-access`,getToken:getMemberstackToken}) : undefined;
+  const staffManagement = mountStaffManagement(staffRoot, { identity: verifiedSession.user, getSession, ownerAccess });
   const authorizeStudent = createStaffTargetClient({ endpoint: `${PREVIEW_ORIGIN}/api/chat-staff-target`, getMemberstackToken });
   const selectionClient = roomSelector.createClient({ endpoint: `${PREVIEW_ORIGIN}/api/chat-rooms`, getToken: getMemberstackToken });
   const flow = createPreviewFlow({

@@ -1,5 +1,6 @@
 const { randomUUID } = require('node:crypto');
 const firestore = require('./_trial-booking-shared');
+const { assertChatAccess } = require('./_chat-suspension');
 
 function createRoomStore(db = firestore, namespace = process.env.CHAT_ROOMS_DATA_NAMESPACE) {
   if (!/^[A-Za-z0-9_-]{1,48}$/.test(namespace || '')) throw new Error('Explicit chat namespace required');
@@ -11,8 +12,12 @@ function createRoomStore(db = firestore, namespace = process.env.CHAT_ROOMS_DATA
   }
   return {
     read: memberId => db.getDocument(`${collection}/${memberId}`),
+    writeAccess: (memberId, previous, fields) => previous
+      ? db.patchDocument(`${collection}/${memberId}`, fields, { updateTime: previous._updateTime })
+      : db.createDocument(collection, memberId, { state: 'idle', ...fields }),
     async acquire(memberId, desired) {
       const previous = await db.getDocument(`${collection}/${memberId}`);
+      assertChatAccess(previous);
       if (previous && previous.state !== 'idle') return null;
       const fields = { state: 'working', operationId: randomUUID(), desired, startedAt: new Date().toISOString() };
       try {

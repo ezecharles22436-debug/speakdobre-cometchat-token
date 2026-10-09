@@ -5,6 +5,7 @@ const { createRoomProvider } = require('./_chat-room-provider');
 const { prepareRoomAccess } = require('./_chat-room-staff');
 const { createRoomStore } = require('./_chat-room-store');
 const { startupSelection } = require('./_chat-startup-selection');
+const { verifyIssuedChatAccess } = require('./_chat-suspension');
 
 function roomRoleForMember(memberId, env = process.env) {
   if (env.CHAT_ROOMS_ENABLED !== 'true') return null;
@@ -89,6 +90,11 @@ module.exports = async function handler(req, res) {
     if (!readOnly) {
       await reactivateCometChatUser(uid);
       token = await createCometChatToken(uid);
+      if (role === 'student') {
+        // Revoke late tokens if suspension started during issuance, or if
+        // durable access can no longer be verified.
+        await verifyIssuedChatAccess({store:createRoomStore(),chat:provider,uid});
+      }
     }
     const memberships = studentState?.memberships || roomAccess?.memberships;
     const rooms = await getVisibleRoomsForUser(uid, memberships
@@ -113,6 +119,7 @@ module.exports = async function handler(req, res) {
   } catch (error) {
     console.error("CometChat token endpoint failed:", safeError(error));
 
+    if (error.code === 'CHAT_SUSPENDED') return res.status(403).json({ error: error.message, code: error.code });
     if (error instanceof HttpError) {
       return res.status(error.status).json({ error: error.publicMessage });
     }

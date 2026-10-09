@@ -4,7 +4,8 @@ export function staffPresentation(role) {
   if (role === 'moderator') return { label: 'Модератор', title: 'Керування групами' };
   return null;
 }
-export function mountStaffManagement(container, { identity, getSession }) {
+import { mountOwnerAccess } from './owner-access.mjs';
+export function mountStaffManagement(container, { identity, getSession, ownerAccess }) {
   const presentation = staffPresentation(identity?.role);
   if (!presentation) return null;
   const doc = container.ownerDocument;
@@ -19,6 +20,11 @@ export function mountStaffManagement(container, { identity, getSession }) {
   help.textContent = 'Оберіть групу нижче. Тут можна відкрити розмову зі студентом, вилучити його з групи або заблокувати в цій групі. Видалення повідомлень доступне в меню повідомлення.';
   content.textContent = 'Спочатку відкрийте потрібну групу.';
   panel.append(title, help, content); toolbar.append(badge, toggle); container.replaceChildren(toolbar, panel);
+  let removeOwner;
+  if (identity.role === 'super_moderator' && ownerAccess) {
+    const ownerRoot = doc.createElement('section'); panel.append(ownerRoot);
+    removeOwner = mountOwnerAccess(ownerRoot, ownerAccess);
+  }
   let disposed = false, checking = false;
   toggle.addEventListener('click', async () => {
     if (disposed || checking) return;
@@ -36,6 +42,6 @@ export function mountStaffManagement(container, { identity, getSession }) {
     content,
     clear() { content.replaceChildren(); content.textContent = 'Відкрийте групу, щоб керувати її учасниками.'; },
     setGroup(name) { title.textContent = `${presentation.title} · ${name}`; },
-    dispose() { disposed = true; container.replaceChildren(); }
+    dispose() { disposed = true; removeOwner?.(); container.replaceChildren(); }
   };
 }

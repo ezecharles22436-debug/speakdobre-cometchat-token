@@ -5,6 +5,7 @@ const { createRoomSelectionService, RoomChangeError } = require('./_chat-room-se
 const { createRoomStore } = require('./_chat-room-store');
 const { createRoomProvider } = require('./_chat-room-provider');
 const { roomReleaseReady } = require('./_chat-room-release');
+const { assertChatAccess } = require('./_chat-suspension');
 
 function createHandler(deps = {}) {
   const env = deps.env || process.env;
@@ -35,6 +36,7 @@ function createHandler(deps = {}) {
       const chat = deps.chat || createRoomProvider();
       if (req.method === 'GET') {
         const record = await store.read(memberId);
+        assertChatAccess(record);
         const memberships = await chat.memberships(memberId);
         return res.status(200).json({ rooms: ROOMS, selected: memberships.map(room => room.guid),
           pending: Boolean(record && record.state !== 'idle') });

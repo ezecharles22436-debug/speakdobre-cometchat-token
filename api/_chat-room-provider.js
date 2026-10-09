@@ -28,6 +28,8 @@ function createRoomProvider(fetcher = fetch, env = process.env) {
     throw new Error('Chat provider pagination limit');
   }
   return {
+    flushTokens: uid => request(`/users/${enc(uid)}/auth_tokens`, 'DELETE'),
+    deactivate: uid => request('/users', 'DELETE', { uidsToDeactivate: [uid] }),
     async user(uid) {
       const payload = await request(`/users/${enc(uid)}`);
       if (payload.data?.uid !== uid || !payload.data.role) throw new Error('Invalid staff identity response');
