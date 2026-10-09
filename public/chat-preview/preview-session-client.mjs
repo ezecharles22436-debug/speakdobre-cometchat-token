@@ -1,5 +1,4 @@
 export const PREVIEW_ORIGIN = 'https://speakdobre-cometchat-git-db9a07-ezecharles22436-4127s-projects.vercel.app';
-import { phaseTimer, reportServerTiming } from './startup-timing.mjs';
 const roles = new Set(['student', 'moderator', 'super_moderator']);
 
 // Use only on Webflow staging with an explicitly signed-in Test Mode member.
@@ -23,7 +22,6 @@ export function createPreviewSessionClient({ pageOrigin, memberstack, fetcher = 
     return token;
   }
   async function getSession() {
-    const done = phaseTimer('authorization');
     const credential = issued;
     const token = await getMemberstackToken();
     const response = await fetcher(`${PREVIEW_ORIGIN}/api/cometchat-token`, {
@@ -32,7 +30,6 @@ export function createPreviewSessionClient({ pageOrigin, memberstack, fetcher = 
       body: credential ? JSON.stringify({ operation: 'verify' }) : '{}', signal: AbortSignal.timeout(15000),
     });
     if (!response.ok) throw Error(response.status === 403 ? 'Немає доступу до Practice Chat.' : 'Не вдалося перевірити доступ до чату.');
-    reportServerTiming(response.headers?.get('Server-Timing'));
     let session = await response.json();
     await member();
     if (credential) {
@@ -42,7 +39,6 @@ export function createPreviewSessionClient({ pageOrigin, memberstack, fetcher = 
     }
     if (typeof session?.token !== 'string' || !session.token || session.user?.uid !== identity || !roles.has(session.user.role) || !Array.isArray(session.rooms) || !Array.isArray(session.staffContacts)) throw Error('Сервер не підтвердив сеанс чату.');
     if (!credential) issued = { uid: session.user.uid, role: session.user.role, token: session.token };
-    done();
     return session;
   }
   return { getSession, getMemberstackToken, checkIdentity: member };

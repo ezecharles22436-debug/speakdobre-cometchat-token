@@ -34,7 +34,7 @@ export default defineConfig(({ mode }) => ({
       const css = Object.keys(bundle).filter(name => name.endsWith('.css') && !name.includes('controls-preview'));
       this.emitFile({ type: 'asset', fileName: 'preview-manifest.json', source: JSON.stringify({ entry: host.fileName, css }) });
       const loader = readFileSync(resolve('preview-loader.mjs'), 'utf8');
-      for (const filename of ['preview-session-client.mjs', 'startup-session.mjs', 'startup-timing.mjs']) {
+      for (const filename of ['preview-session-client.mjs', 'startup-session.mjs']) {
         const source = readFileSync(resolve(filename), 'utf8');
         this.emitFile({ type: 'asset', fileName: filename, source: mode === 'live' ? productionSource(source, filename) : source });
       }

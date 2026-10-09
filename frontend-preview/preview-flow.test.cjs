@@ -16,6 +16,16 @@ test('student cannot mount chat until server-backed selector signals readiness',
 test('staff bypass selector but never auto-open a conversation', async () => {
   const f = await fixture('moderator'); await f.flow.start(); assert.deepEqual(f.events, ['chat','nav','hide']);
 });
+test('host snapshot skips only redundant start read and retains both SDK-boundary checks', async () => {
+  let reads=0; const session={token:'synthetic',user:{uid:'mem_sb_fixture',role:'moderator'},rooms:[],staffContacts:[]};
+  const f=await fixture('moderator',{getSession:async()=>{reads++;return session;}});
+  await f.flow.start({verifiedSession:session});assert.equal(reads,2);assert.ok(f.events.includes('nav'));
+});
+test('changed account after host verification cannot initialize chat',async()=>{
+  const f=await fixture('moderator');
+  await assert.rejects(f.flow.start({verifiedSession:{token:'synthetic',user:{uid:'mem_sb_other',role:'moderator'}}}));
+  assert.ok(!f.events.includes('chat'));
+});
 
 test('returning student opens navigation after server verifies saved selection', async () => {
   const f = await fixture('student', { hasSavedSelection: async () => true });

@@ -12,7 +12,7 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
   const startup = startupSession || createStartupSession({ load: loadSession, checkIdentity });
   const getSession = () => startup.getSession();
   // Validate account and entitlement before changing the host area or initializing SDK.
-  await getSession();
+  const verifiedSession = await getSession();
   const doc = container.ownerDocument;
   const picker = doc.createElement('section'), rail = doc.createElement('nav'), chat = doc.createElement('div');
   container.replaceChildren(picker, rail, chat);
@@ -37,7 +37,7 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
     mountNavigation: options => roomNavigation.mount({ ...options, root: rail, onChangeGroups: () => { doc.defaultView.location.hash = 'choose-groups'; doc.defaultView.location.reload(); } }),
     clear: () => { container.replaceChildren(); },
   });
-  try { await flow.start({ chooseGroups: doc.defaultView.location.hash === '#choose-groups' }); return flow; }
+  try { await flow.start({ chooseGroups: doc.defaultView.location.hash === '#choose-groups', verifiedSession }); return flow; }
   catch (error) { await flow.dispose(); throw error; }
   finally { startup.finish(); }
 }

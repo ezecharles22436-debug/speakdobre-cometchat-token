@@ -27,9 +27,11 @@ export function createPreviewFlow({ getSession, hasSavedSelection = async () => 
     } finally { starting = false; }
   }
   return {
-    async start({ chooseGroups = false } = {}) {
+    async start({ chooseGroups = false, verifiedSession } = {}) {
       if (identity || disposed) throw Error('Перевірку вже розпочато.');
-      const session = check(await getSession());
+      // Host has just verified this mount; do not immediately repeat that read.
+      // open() still rechecks before SDK initialization and after it.
+      const session = check(verifiedSession || await getSession());
       identity = { uid: session.user.uid, role: session.user.role };
       if (identity.role === 'student' && (chooseGroups || !await hasSavedSelection(session))) await showSelector({ onReady: open });
       else await open();
