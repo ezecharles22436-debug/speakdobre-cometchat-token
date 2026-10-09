@@ -13,7 +13,7 @@ export function productionSource(source, filename) {
     .replaceAll('https://speakdobre.webflow.io', 'https://www.speakdobre.com')
     .replaceAll('168437005e7f6fa2a', '1677376866e3f736f');
   if (name === 'preview-session-client.mjs') {
-    result = result.replace("import { phaseTimer } from './startup-timing.mjs';", 'const phaseTimer = () => () => {};');
+    result = result.replace("import { phaseTimer, reportServerTiming } from './startup-timing.mjs';", 'const phaseTimer = () => () => {}; const reportServerTiming = () => {};');
     const guard = '/^mem_sb_[A-Za-z0-9_-]+$/';
     if (!result.includes(guard)) throw Error('Live member guard must be reviewed');
     result = result.replace(guard, '/^mem_(?!sb_)[A-Za-z0-9_-]+$/');

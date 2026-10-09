@@ -1,5 +1,5 @@
 export const PREVIEW_ORIGIN = 'https://speakdobre-cometchat-git-db9a07-ezecharles22436-4127s-projects.vercel.app';
-import { phaseTimer } from './startup-timing.mjs';
+import { phaseTimer, reportServerTiming } from './startup-timing.mjs';
 const roles = new Set(['student', 'moderator', 'super_moderator']);
 
 // Use only on Webflow staging with an explicitly signed-in Test Mode member.
@@ -32,6 +32,7 @@ export function createPreviewSessionClient({ pageOrigin, memberstack, fetcher = 
       body: credential ? JSON.stringify({ operation: 'verify' }) : '{}', signal: AbortSignal.timeout(15000),
     });
     if (!response.ok) throw Error(response.status === 403 ? 'Немає доступу до Practice Chat.' : 'Не вдалося перевірити доступ до чату.');
+    reportServerTiming(response.headers?.get('Server-Timing'));
     let session = await response.json();
     await member();
     if (credential) {

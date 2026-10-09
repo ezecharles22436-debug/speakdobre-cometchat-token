@@ -5,6 +5,7 @@ const { createRoomProvider } = require('./_chat-room-provider');
 const { prepareRoomAccess } = require('./_chat-room-staff');
 const { createRoomStore } = require('./_chat-room-store');
 const { startupSelection } = require('./_chat-startup-selection');
+const { createStartupTiming } = require('./_chat-startup-timing');
 
 function roomRoleForMember(memberId, env = process.env) {
   if (env.CHAT_ROOMS_ENABLED !== 'true') return null;
@@ -19,6 +20,7 @@ function roomRoleForMember(memberId, env = process.env) {
 
 module.exports = async function handler(req, res) {
   setCors(req, res);
+  const timing = createStartupTiming(req);
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
@@ -44,14 +46,14 @@ module.exports = async function handler(req, res) {
       return res.status(401).json({ error: "Authentication required." });
     }
 
-    const verified = await verifyMemberstackToken(sessionToken);
+    const verified = await timing.run('verify', () => verifyMemberstackToken(sessionToken));
     const memberId = getVerifiedMemberId(verified);
 
     if (!memberId) {
       return res.status(401).json({ error: "Invalid Memberstack session." });
     }
 
-    const member = await getMemberstackMember(memberId);
+    const member = await timing.run('member', () => getMemberstackMember(memberId));
     if (!member || member.id !== memberId) {
       return res.status(401).json({ error: "Member not found." });
     }
@@ -75,26 +77,27 @@ module.exports = async function handler(req, res) {
     const name = cleanText(`${firstName} ${lastName}`.trim() || email || "SpeakDobre Member", 100);
     const uid = member.id;
 
-    if (!readOnly) await ensureCometChatUser(uid, name, role);
+    if (!readOnly) await timing.run('provision', () => ensureCometChatUser(uid, name, role));
     const provider = role ? createRoomProvider() : null;
     const [roomAccess, studentState] = await Promise.all([
-      role ? prepareRoomAccess({ uid, role, chat: provider, readOnly }) : null,
+      role ? timing.run('contacts', () => prepareRoomAccess({ uid, role, chat: provider, readOnly })) : null,
       role === 'student' ? (async () => {
-        const memberships = await provider.memberships(uid);
-        const selection = await startupSelection({ uid, memberships, store: createRoomStore() });
+        const memberships = await timing.run('memberships', () => provider.memberships(uid));
+        const selection = await timing.run('selection', () => startupSelection({ uid, memberships, store: createRoomStore() }));
         return { memberships, selection };
       })() : null,
     ]);
     let token;
     if (!readOnly) {
-      await reactivateCometChatUser(uid);
-      token = await createCometChatToken(uid);
+      await timing.run('reactivate', () => reactivateCometChatUser(uid));
+      token = await timing.run('token', () => createCometChatToken(uid));
     }
     const memberships = studentState?.memberships || roomAccess?.memberships;
     const rooms = await getVisibleRoomsForUser(uid, memberships
       ? { memberships: async () => memberships } : undefined);
 
     res.setHeader("Cache-Control", "no-store");
+    timing.attach(res);
     return res.status(200).json({
       ...(readOnly ? { verified: true } : { token }),
       user: {
