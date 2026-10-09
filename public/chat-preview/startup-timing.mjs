@@ -1,10 +1,14 @@
 // Temporary diagnostics: fixed labels and durations only, never payloads.
 // Not part of production origin replacement; always restricted to staging.
-const labels = new Set(['manifest', 'assets', 'interface', 'navigation', 'authorization', 'sdk-login', 'group-render']);
+const labels = new Set(['manifest', 'assets', 'interface', 'navigation', 'authorization', 'sdk-login', 'group-render', 'identity-only', 'member-before-cookie', 'cookie', 'member-after-cookie', 'request', 'response-json', 'member-after-request']);
 export function phaseTimer(label) {
   const enabled = typeof location !== 'undefined' && location.origin === 'https://speakdobre.webflow.io' && labels.has(label);
   const start = Date.now();
   return () => { if (enabled) console.info('[sd-perf]', label, Date.now() - start); };
+}
+export async function timeClientStep(label, operation) {
+  const finish = phaseTimer(label);
+  try { return await operation(); } finally { finish(); }
 }
 export function reportServerTiming(value) {
   if (typeof location === 'undefined' || location.origin !== 'https://speakdobre.webflow.io' || typeof value !== 'string') return;
