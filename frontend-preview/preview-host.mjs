@@ -11,13 +11,8 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
   const { getSession: loadSession, getMemberstackToken, checkIdentity } = createPreviewSessionClient({ pageOrigin: container.ownerDocument.defaultView.location.origin, memberstack });
   const startup = createStartupSession({ load: loadSession, checkIdentity });
   const getSession = () => startup.getSession();
-  const timingStart = performance.now();
-  const timing = phase => {
-    if (container.ownerDocument.defaultView.location.hostname.endsWith('.webflow.io')) console.info('[SpeakDobre mount]', phase, Math.round(performance.now() - timingStart));
-  };
   // Validate account and entitlement before changing the host area or initializing SDK.
   await getSession();
-  timing('access-ready');
   const doc = container.ownerDocument;
   const picker = doc.createElement('section'), rail = doc.createElement('nav'), chat = doc.createElement('div');
   container.replaceChildren(picker, rail, chat);
@@ -34,12 +29,7 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
       picker.hidden = true;
       if (doc.defaultView.location.hash === '#choose-groups') doc.defaultView.history.replaceState(null, '', doc.defaultView.location.pathname + doc.defaultView.location.search);
     },
-    mountChat: async () => {
-      timing('chat-init-start');
-      const result = await mountPreviewChat({ container: chat, appId: '168437005e7f6fa2a', getSession, authorizeStudent });
-      timing('chat-init-ready');
-      return result;
-    },
+    mountChat: () => mountPreviewChat({ container: chat, appId: '168437005e7f6fa2a', getSession, authorizeStudent }),
     mountNavigation: options => roomNavigation.mount({ ...options, root: rail, onChangeGroups: () => { doc.defaultView.location.hash = 'choose-groups'; doc.defaultView.location.reload(); } }),
     clear: () => { container.replaceChildren(); },
   });
