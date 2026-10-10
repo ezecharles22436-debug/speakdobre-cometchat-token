@@ -4,6 +4,12 @@
   else root.SpeakDobreRoomSelector = api;
 })(typeof window === 'undefined' ? {} : window, function () {
   'use strict';
+  function cooldownMessage(value) {
+    const date = new Date(value);
+    return Number.isFinite(date.getTime())
+      ? `Наступна зміна груп доступна ${new Intl.DateTimeFormat('uk-UA', { timeZone: 'Europe/Kyiv', dateStyle: 'long', timeStyle: 'short' }).format(date)} (за київським часом).`
+      : 'Змінювати групи можна раз на 30 днів.';
+  }
   function createClient({ endpoint, getToken, fetcher = fetch }) {
     const url = new URL(endpoint);
     if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
@@ -20,6 +26,7 @@
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
+        if (data.code === 'GROUP_CHANGE_COOLDOWN') throw Object.assign(new Error(cooldownMessage(data.nextChangeAt)), { status: response.status });
         const messages = { 401: 'Увійдіть до акаунта.', 403: 'Перевірте доступ до підписки або зверніться до модератора.',
           409: 'Зміна груп ще обробляється. Оновіть стан за мить.' };
         throw Object.assign(new Error(messages[response.status] || 'Не вдалося оновити групи. Спробуйте пізніше.'), { status: response.status });
@@ -35,10 +42,10 @@
   }
   async function mount({ container, client, onReady }) {
     const doc = container.ownerDocument;
-    let busy = false, catalog = [], controls = [], pending = false;
+    let busy = false, catalog = [], controls = [], pending = false, locked = false;
     const el = (tag, text) => { const node = doc.createElement(tag); if (text) node.textContent = text; return node; };
     const heading = el('h2', 'Оберіть свої групи');
-    const intro = el('p', 'Одна група за рівнем англійської та до двох груп за інтересами. Усього — до трьох груп.');
+    const intro = el('p', 'Одна група за рівнем англійської та до двох груп за інтересами. Усього — до трьох груп. Змінювати вибір можна раз на 30 днів.');
     const form = el('form'), fields = el('div'), status = el('p'), save = el('button', 'Зберегти та відкрити чат');
     const refresh = el('button', 'Оновити стан');
     const count = el('p', 'Обрано 0 із 3 груп'), actions = el('div');
@@ -55,8 +62,9 @@
     function update() {
       const topics = controls.filter(input => input.type === 'checkbox' && input.checked).length;
       count.textContent = `Обрано ${selected().length} із 3 груп`;
-      controls.forEach(input => { input.disabled = busy || pending || (input.type === 'checkbox' && !input.checked && topics >= 2); });
+      controls.forEach(input => { input.disabled = busy || pending || locked || (input.type === 'checkbox' && !input.checked && topics >= 2); });
       save.disabled = busy || pending || !validSelection(catalog, selected());
+      save.textContent = locked ? 'Відкрити чат із поточними групами' : 'Зберегти та відкрити чат';
       refresh.disabled = busy;
       form.setAttribute('aria-busy', String(busy));
     }
@@ -66,7 +74,7 @@
       try {
         const data = await client.load();
         if (!Array.isArray(data.rooms) || !Array.isArray(data.selected) || typeof data.pending !== 'boolean') throw new Error('Не вдалося перевірити стан груп.');
-        catalog = data.rooms; pending = data.pending; controls = []; fields.replaceChildren();
+        catalog = data.rooms; pending = data.pending; locked = data.canChange === false; controls = []; fields.replaceChildren();
         for (const [kind, title] of [['level', 'Ваш рівень англійської'], ['topic', 'Ваші інтереси — до двох груп']]) {
           const fieldset = el('fieldset'); fieldset.append(el('legend', title));
           for (const room of catalog.filter(room => room.kind === kind)) {
@@ -85,7 +93,7 @@
           }
           fields.append(fieldset);
         }
-        status.textContent = pending ? 'Попередня зміна ще перевіряється. Оновіть стан або зверніться до модератора.' : 'Ваш вибір можна змінити перед входом до чату.';
+        status.textContent = pending ? 'Попередня зміна ще перевіряється. Оновіть стан або зверніться до модератора.' : locked ? cooldownMessage(data.nextChangeAt) : 'Після збереження наступна зміна буде доступна через 30 днів.';
       } catch (error) { pending = true; status.textContent = error.message; }
       finally { busy = false; update(); }
     }

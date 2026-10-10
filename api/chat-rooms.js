@@ -6,6 +6,7 @@ const { createRoomStore } = require('./_chat-room-store');
 const { createRoomProvider } = require('./_chat-room-provider');
 const { roomReleaseReady } = require('./_chat-room-release');
 const { assertChatAccess } = require('./_chat-suspension');
+const { selectionWindow } = require('./_chat-room-cooldown');
 
 function createHandler(deps = {}) {
   const env = deps.env || process.env;
@@ -39,7 +40,7 @@ function createHandler(deps = {}) {
         assertChatAccess(record);
         const memberships = await chat.memberships(memberId);
         return res.status(200).json({ rooms: ROOMS, selected: memberships.map(room => room.guid),
-          pending: Boolean(record && record.state !== 'idle') });
+          pending: Boolean(record && record.state !== 'idle'), ...selectionWindow(record) });
       }
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
       if (!body || Object.keys(body).some(key => key !== 'rooms')) {
@@ -52,7 +53,8 @@ function createHandler(deps = {}) {
       return res.status(200).json(await select(memberId, body.rooms));
     } catch (error) {
       if (error instanceof SelectionError || error instanceof RoomChangeError) {
-        return res.status(error.status).json({ error: error.message, code: error.code });
+        return res.status(error.status).json({ error: error.message, code: error.code,
+          ...(error.nextChangeAt ? { nextChangeAt: error.nextChangeAt } : {}) });
       }
       if (error instanceof SyntaxError) return res.status(400).json({ error: 'Некоректні дані.' });
       const status = [400, 401, 403, 409, 413, 415].includes(error.status) ? error.status : 503;

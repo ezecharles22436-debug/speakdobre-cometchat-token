@@ -20,18 +20,22 @@ function createRoomStore(db = firestore, namespace = process.env.CHAT_ROOMS_DATA
       assertChatAccess(previous);
       if (previous && previous.state !== 'idle') return null;
       const fields = { state: 'working', operationId: randomUUID(), desired, startedAt: new Date().toISOString() };
+      // Persist the legacy anchor before overwriting startedAt on a retry.
+      if (!previous?.selectionChangedAt && previous?.selected?.length && Number.isFinite(Date.parse(previous.startedAt))) {
+        fields.selectionChangedAt = previous.startedAt;
+      }
       try {
         const record = previous
           ? await db.patchDocument(`${collection}/${memberId}`, fields, { updateTime: previous._updateTime })
           : await db.createDocument(collection, memberId, fields);
         if (!record?._updateTime) throw new Error('Missing lock version');
-        return { memberId, updateTime: record._updateTime };
+        return { memberId, updateTime: record._updateTime, previous };
       } catch (error) {
         if (error.status === 409) return null;
         throw error;
       }
     },
-    complete: (lock, selected) => finish(lock, { state: 'idle', selected, reason: null }),
+    complete: (lock, selected) => finish(lock, { state: 'idle', selected, reason: null, selectionChangedAt: new Date().toISOString() }),
     release: lock => finish(lock, { state: 'idle' }),
     flagForReconciliation: (lock, reason) => finish(lock, { state: 'reconcile', reason })
   };

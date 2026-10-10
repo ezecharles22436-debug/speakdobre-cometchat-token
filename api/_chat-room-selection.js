@@ -1,4 +1,5 @@
 const { validateSelection, membershipDelta } = require('./_chat-room-policy');
+const { selectionWindow } = require('./_chat-room-cooldown');
 
 class RoomChangeError extends Error {
   constructor(code, status, message) { super(message); Object.assign(this, { code, status }); }
@@ -8,7 +9,7 @@ class RoomChangeError extends Error {
 // lock in a serverless deployment. acquire must be atomic and durable per member.
 // An uncertain mutation retains its lock for explicit reconciliation, never a TTL
 // takeover: an old worker must not be able to add rooms after another starts.
-function createRoomSelectionService({ access, locks, chat }) {
+function createRoomSelectionService({ access, locks, chat, now = Date.now }) {
   return async function selectRooms(verifiedMemberId, requestedIds) {
     if (!/^mem_[A-Za-z0-9_-]{1,96}$/.test(verifiedMemberId || '')) {
       throw new RoomChangeError('AUTH_REQUIRED', 401, 'Увійдіть до акаунта.');
@@ -37,6 +38,17 @@ function createRoomSelectionService({ access, locks, chat }) {
         }
       }
       const delta = membershipDelta(current.map(room => room.guid), desired);
+      // A same-selection retry must not extend the waiting period.
+      if (!delta.remove.length && !delta.add.length) {
+        await locks.release(lock);
+        return { rooms: desired };
+      }
+      const window = selectionWindow(lock.previous, now());
+      if (!window.canChange) {
+        const error = new RoomChangeError('GROUP_CHANGE_COOLDOWN', 409, 'Змінювати групи можна раз на 30 днів.');
+        error.nextChangeAt = window.nextChangeAt;
+        throw error;
+      }
       for (const guid of delta.remove) {
         mutated = true;
         await chat.remove(guid, verifiedMemberId);
