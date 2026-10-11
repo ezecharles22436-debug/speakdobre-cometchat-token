@@ -40,7 +40,7 @@ function createHandler(deps = {}) {
         assertChatAccess(record);
         const memberships = await chat.memberships(memberId);
         return res.status(200).json({ rooms: ROOMS, selected: memberships.map(room => room.guid),
-          pending: Boolean(record && record.state !== 'idle'), ...selectionWindow(record) });
+          pending: Boolean(record && record.state !== 'idle'), ...selectionWindow(record, Date.now(), memberships) });
       }
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
       if (!body || Object.keys(body).some(key => key !== 'rooms')) {

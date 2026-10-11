@@ -101,3 +101,22 @@ test('endpoint never accepts caller supplied identity or role', async () => {
     assert.equal(res.code, 400);
   } finally { if (original === undefined) delete process.env.MEMBERSTACK_ALLOWED_PLAN_IDS; else process.env.MEMBERSTACK_ALLOWED_PLAN_IDS = original; }
 });
+
+test('GET reports unknown legacy date without modifying groups or hiding them', async () => {
+  const original = process.env.MEMBERSTACK_ALLOWED_PLAN_IDS;
+  process.env.MEMBERSTACK_ALLOWED_PLAN_IDS = 'plan_test';
+  try {
+    const member = { id: 'mem_legacy', planConnections: [{ planId: 'plan_test', active: true }] };
+    const res = response();
+    await createHandler({ env: enabled, verifyMember: async () => ({ memberId: member.id, member }),
+      store: { read: async () => null },
+      chat: { memberships: async () => [{ guid: 'speakdobre-c2', scope: 'participant' }] }
+    })({ method: 'GET', headers: { origin: 'https://www.speakdobre.com' } }, res);
+    assert.equal(res.code, 200);
+    assert.deepEqual(res.body.selected, ['speakdobre-c2']);
+    assert.equal(res.body.pending, false);
+    assert.equal(res.body.canChange, false);
+    assert.equal(res.body.cooldownReviewRequired, true);
+    assert.equal(res.body.nextChangeAt, null);
+  } finally { if (original === undefined) delete process.env.MEMBERSTACK_ALLOWED_PLAN_IDS; else process.env.MEMBERSTACK_ALLOWED_PLAN_IDS = original; }
+});

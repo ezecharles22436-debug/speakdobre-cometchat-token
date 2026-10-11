@@ -4,7 +4,9 @@
   else root.SpeakDobreRoomSelector = api;
 })(typeof window === 'undefined' ? {} : window, function () {
   'use strict';
+  const dateReviewMessage = 'Не вдалося підтвердити дату останньої зміни груп. Поточні групи доступні. Для зміни зверніться до модератора.';
   function cooldownMessage(value) {
+    if (!value) return 'Змінювати групи можна раз на 30 днів.';
     const date = new Date(value);
     return Number.isFinite(date.getTime())
       ? `Наступна зміна груп доступна ${new Intl.DateTimeFormat('uk-UA', { timeZone: 'Europe/Kyiv', dateStyle: 'long', timeStyle: 'short' }).format(date)} (за київським часом).`
@@ -26,6 +28,7 @@
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
+        if (data.code === 'GROUP_CHANGE_DATE_REVIEW') throw Object.assign(new Error(dateReviewMessage), { status: response.status });
         if (data.code === 'GROUP_CHANGE_COOLDOWN') throw Object.assign(new Error(cooldownMessage(data.nextChangeAt)), { status: response.status });
         const messages = { 401: 'Увійдіть до акаунта.', 403: 'Перевірте доступ до підписки або зверніться до модератора.',
           409: 'Зміна груп ще обробляється. Оновіть стан за мить.' };
@@ -93,7 +96,7 @@
           }
           fields.append(fieldset);
         }
-        status.textContent = pending ? 'Попередня зміна ще перевіряється. Оновіть стан або зверніться до модератора.' : locked ? cooldownMessage(data.nextChangeAt) : 'Після збереження наступна зміна буде доступна через 30 днів.';
+        status.textContent = pending ? 'Попередня зміна ще перевіряється. Оновіть стан або зверніться до модератора.' : data.cooldownReviewRequired ? dateReviewMessage : locked ? cooldownMessage(data.nextChangeAt) : 'Після збереження наступна зміна буде доступна через 30 днів.';
       } catch (error) { pending = true; status.textContent = error.message; }
       finally { busy = false; update(); }
     }

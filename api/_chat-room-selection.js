@@ -43,7 +43,11 @@ function createRoomSelectionService({ access, locks, chat, now = Date.now }) {
         await locks.release(lock);
         return { rooms: desired };
       }
-      const window = selectionWindow(lock.previous, now());
+      const window = selectionWindow(lock.previous, now(), current);
+      if (window.cooldownReviewRequired) {
+        throw new RoomChangeError('GROUP_CHANGE_DATE_REVIEW', 409,
+          'Не вдалося підтвердити дату останньої зміни груп. Поточні групи доступні. Для зміни зверніться до модератора.');
+      }
       if (!window.canChange) {
         const error = new RoomChangeError('GROUP_CHANGE_COOLDOWN', 409, 'Змінювати групи можна раз на 30 днів.');
         error.nextChangeAt = window.nextChangeAt;

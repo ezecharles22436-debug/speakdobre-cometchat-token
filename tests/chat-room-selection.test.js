@@ -8,7 +8,7 @@ function fixture(overrides = {}) {
   const deps = {
     access: async () => ({ active: true, role: 'student' }),
     locks: {
-      acquire: async () => { if (held) return null; held = true; return 'operation'; },
+      acquire: async () => { if (held) return null; held = true; return { previous: { selectionChangedAt: '2020-01-01T00:00:00Z' } }; },
       complete: async () => { events.push('complete'); held = false; },
       release: async () => { events.push('release'); held = false; },
       flagForReconciliation: async () => { events.push('reconcile'); }

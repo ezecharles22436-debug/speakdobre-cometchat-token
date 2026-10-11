@@ -26,3 +26,13 @@ test('missing session makes no request; permission failures use Ukrainian text, 
 test('rejects unsafe endpoint URLs', () => {
   for (const endpoint of ['http://example.test', 'https://user:secret@example.test', 'https://example.test?token=secret']) assert.throws(() => createClient({ endpoint }));
 });
+
+test('date-review errors preserve chat access guidance; null dates never display 1970', async () => {
+  for (const code of ['GROUP_CHANGE_DATE_REVIEW', 'GROUP_CHANGE_COOLDOWN']) {
+    const client = createClient({ endpoint: 'https://preview.example.test/api/chat-rooms', getToken: async () => 'synthetic',
+      fetcher: async () => ({ ok: false, status: 409, json: async () => ({ code, nextChangeAt: null }) }) });
+    await assert.rejects(client.save(['speakdobre-c2']), error =>
+      error.status === 409 && !error.message.includes('1970') &&
+      (code !== 'GROUP_CHANGE_DATE_REVIEW' || error.message.includes('Поточні групи доступні')));
+  }
+});
