@@ -62,6 +62,25 @@ function createSessionAdapter({ getSession, sdk, render, clear, authorizeStudent
   }
   return {
     open,
+    // Staff directory reads need a verified SDK session, but must not open a
+    // group, change memberships, send messages, or discard the current view.
+    async prepareStaff() {
+      if (disposed || busy) throw Error('Зачекайте завершення попередньої дії.');
+      busy = true;
+      try {
+        const session = check(await getSession());
+        if (!['moderator', 'super_moderator'].includes(session.user.role)) throw Error('Доступ лише для модераторів.');
+        const current = await sdk.getLoggedInUser();
+        if (current && current.getUid() !== session.user.uid) await sdk.logout();
+        const user = await sdk.loginWithAuthToken(session.token);
+        if (user?.getUid() !== session.user.uid) throw Error('Не вдалося перевірити акаунт.');
+        identity = { uid: session.user.uid, role: session.user.role };
+        const fresh = check(await getSession());
+        if (disposed) throw Error('Сеанс завершено.');
+        return fresh;
+      } catch (error) { await reset().catch(() => {}); throw error; }
+      finally { busy = false; }
+    },
     async dispose() { disposed = true; await reset(); },
   };
 }

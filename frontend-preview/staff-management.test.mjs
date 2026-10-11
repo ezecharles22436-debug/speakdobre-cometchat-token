@@ -27,3 +27,22 @@ test('clear removes previous group members and disposal removes staff controls',
   const f=fixture();f.panel.content.append({private:'synthetic'});f.panel.clear();assert.equal(f.panel.content.children.length,0);
   f.panel.setGroup('C2');assert.match(f.body.children[0].textContent,/C2/);f.panel.dispose();assert.equal(f.container.children.length,0);
 });
+
+test('student directory has an independent visible staff button, not a group prerequisite',async()=>{
+  for(const role of ['moderator','super_moderator']) {
+    const f=fixture(role);const button=f.container.children[0].children[2];
+    assert.equal(button.textContent,'Студенти');let opens=0;
+    f.panel.bindDirectory(async()=>{opens++;});assert.equal(button.disabled,false);
+    await button.handlers.click();assert.equal(f.panel.directoryRoot.hidden,false);assert.equal(opens,1);
+    assert.equal(f.body.hidden,true);
+    f.panel.clear();assert.equal(f.panel.directoryRoot.hidden,false);
+    await button.handlers.click();assert.equal(f.panel.directoryRoot.hidden,true);
+    await button.handlers.click();f.panel.closeDirectory();assert.equal(f.panel.directoryRoot.hidden,true);assert.equal(button.attrs['aria-expanded'],'false');
+  }
+});
+test('student directory button rechecks staff identity before revealing rows',async()=>{
+  const f=fixture();let opens=0;f.panel.bindDirectory(async()=>{opens++;});
+  f.setSession({token:'synthetic',user:{uid:'mem_student',role:'student'}});
+  await f.container.children[0].children[2].handlers.click();
+  assert.equal(opens,0);assert.equal(f.panel.directoryRoot.hidden,true);
+});

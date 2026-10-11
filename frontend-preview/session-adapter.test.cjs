@@ -72,6 +72,20 @@ test('disposal during login prevents late render and future opens', async () => 
 
 const staffSession = () => ({ ...session(), user: { uid: 'test_student', role: 'moderator' } });
 const targetGrant = () => ({ actor: staffSession().user, target: { uid: 'selected_student' }, roomGuid: 'c2' });
+
+test('staff directory authentication does not render, send, or open a room', async () => {
+  const f=fixture(async()=>staffSession());const verified=await f.adapter.prepareStaff();
+  assert.equal(verified.user.role,'moderator');assert.deepEqual(f.rendered,[]);assert.deepEqual(f.events,['login']);
+});
+test('students cannot initialize the staff directory SDK session', async () => {
+  const f=fixture();await assert.rejects(f.adapter.prepareStaff());assert.ok(!f.events.includes('login'));
+});
+test('staff directory identity and role changes during login fail closed', async () => {
+  for(const mutate of [s=>({...s,user:{uid:'other',role:'moderator'}}),s=>({...s,user:{uid:'test_student',role:'student'}})]) {
+    let reads=0;const f=fixture(async()=>++reads===1?staffSession():mutate(staffSession()));
+    await assert.rejects(f.adapter.prepareStaff());assert.ok(f.events.includes('logout'));assert.deepEqual(f.rendered,[]);
+  }
+});
 test('staff student route checks server authorization before and after SDK login', async () => {
   let checks = 0;
   const f = fixture(async () => staffSession(), {}, async args => {

@@ -13,6 +13,7 @@ import { createIncomingCalls } from './incoming-calls.mjs';
 import { createOutgoingCalls } from './outgoing-calls.mjs';
 import { mountPreviewCall } from './call-host';
 import { mountStudentPicker } from './student-picker.mjs';
+import { mountStudentDirectory } from './student-directory.mjs';
 import { moderateGroupMember } from './member-moderation.mjs';
 import { ReportProvider as CometChatProvider } from './report-provider';
 export { mountPreviewCall } from './call-host';
@@ -26,7 +27,7 @@ type View = { type: 'group' | 'user'; id: string; role: string; canStartCalls: b
 export async function mountPreviewChat({ container, appId, getSession, authorizeStudent, staffManagement }: {
   container: HTMLElement; appId: string; getSession: () => Promise<Session>;
   authorizeStudent?: (target:{uid:string;roomGuid:string}) => Promise<any>;
-  staffManagement?: {content:HTMLElement;clear:()=>void;setGroup:(name:string)=>void} | null;
+  staffManagement?: {content:HTMLElement;directoryRoot:HTMLElement;bindDirectory:(open:()=>Promise<boolean>)=>void;closeDirectory:()=>void;clear:()=>void;setGroup:(name:string)=>void} | null;
 }) {
   if (appId !== '168437005e7f6fa2a') throw Error('Доступна лише ізольована версія чату.');
   await CometChatUIKit.init(new UIKitSettingsBuilder().setAppId(appId).setRegion('eu').setCallingEnabled(true).build());
@@ -114,6 +115,25 @@ export async function mountPreviewChat({ container, appId, getSession, authorize
       </CometChatProvider>);
     },
   });
+  const staffIdentity = staffManagement ? (await getSession()).user : null;
+  const directory = staffManagement && staffIdentity ? mountStudentDirectory(staffManagement.directoryRoot, {
+    identity: staffIdentity, getSession, prepare: () => adapter.prepareStaff(),
+    createRequest: (guid:string, limit:number, query:string) => {
+      const builder = new CometChat.GroupMembersRequestBuilder(guid).setLimit(limit).setScopes(['participant']);
+      if (query) builder.setSearchKeyword(query);
+      return builder.build();
+    },
+    onSelect: async (uid:string, guid:string) => {
+      const opened = await adapter.open('user', uid, guid);
+      if (opened) {
+        staffManagement?.closeDirectory();
+        messages.setAttribute('tabindex','-1'); messages.focus({preventScroll:true});
+        messages.scrollIntoView({block:'start',behavior:doc.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+      }
+      return opened;
+    },
+  }) : null;
+  if (directory) staffManagement?.bindDirectory(directory.open);
   clear();
-  return { open: adapter.open, async dispose() { try { await adapter.dispose(); } finally { root.unmount(); container.replaceChildren(); } } };
+  return { open: adapter.open, async dispose() { directory?.dispose(); try { await adapter.dispose(); } finally { root.unmount(); container.replaceChildren(); } } };
 }
