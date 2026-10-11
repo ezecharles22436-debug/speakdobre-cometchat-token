@@ -13,6 +13,13 @@ test('student cannot mount chat until server-backed selector signals readiness',
   await f.navigation().app.chatWithGroup('c2'); assert.deepEqual(f.events.at(-1), ['group','c2',undefined,undefined]);
   assert.equal(await f.selector().onReady(), false);
 });
+
+test('notification hook waits for authorized membership, SDK and navigation readiness',async()=>{
+  let calls=0;
+  const f=await fixture('student',{onChatReady:async chat=>{calls++;assert.equal(typeof chat.open,'function');assert.ok(f.events.includes('hide'));}});
+  await f.flow.start();assert.equal(calls,0);await f.selector().onReady();assert.equal(calls,1);
+  await f.selector().onReady();assert.equal(calls,1);
+});
 test('staff bypass selector but never auto-open a conversation', async () => {
   const f = await fixture('moderator'); await f.flow.start(); assert.deepEqual(f.events, ['chat','nav','hide']);
 });

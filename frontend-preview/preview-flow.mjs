@@ -1,6 +1,6 @@
 // Framework-independent orchestration. Existing server-backed selector remains
 // authoritative; no optimistic group membership or automatic room opening.
-export function createPreviewFlow({ getSession, hasSavedSelection = async () => false, showSelector, hideSelector, mountChat, mountNavigation, clear }) {
+export function createPreviewFlow({ getSession, hasSavedSelection = async () => false, showSelector, hideSelector, mountChat, mountNavigation, onChatReady = async () => {}, clear }) {
   let identity, chat, disposed = false, starting = false, ready = false;
   function check(session) {
     if (disposed || !session?.token || !session.user?.uid || !['student','moderator','super_moderator'].includes(session.user.role)) throw Error('Сеанс чату недоступний.');
@@ -21,7 +21,9 @@ export function createPreviewFlow({ getSession, hasSavedSelection = async () => 
         chatWithUser: (id, verified) => chat.open('user', id, undefined, verified ? check(verified) : undefined),
       } });
       if (disposed) return false;
-      hideSelector(); ready = true; return true;
+      hideSelector(); ready = true;
+      await onChatReady(chat);
+      return !disposed;
     } catch (error) {
       await chat?.dispose(); chat = undefined; clear(); throw error;
     } finally { starting = false; }

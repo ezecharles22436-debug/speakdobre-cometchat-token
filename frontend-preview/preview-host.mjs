@@ -4,6 +4,7 @@ import { createPreviewFlow } from './preview-flow.mjs';
 import { createStartupSession } from './startup-session.mjs';
 import { mountStaffManagement } from './staff-management.mjs';
 import { createOwnerAccessClient } from './owner-access.mjs';
+import { createNotificationNavigation } from './notification-navigation.mjs';
 
 // Explicit host entry only; never auto-runs on import. The approved staging embed
 // must load pinned SDK assets first and must NOT run the old widget concurrently.
@@ -16,8 +17,11 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
   // Validate account and entitlement before changing the host area or initializing SDK.
   const verifiedSession = await getSession();
   const doc = container.ownerDocument;
-  const staffRoot = doc.createElement('div'), inboxRoot = doc.createElement('div'), picker = doc.createElement('section'), rail = doc.createElement('nav'), chat = doc.createElement('div');
-  container.replaceChildren(staffRoot, picker, inboxRoot, rail, chat);
+  const staffRoot = doc.createElement('div'), inboxRoot = doc.createElement('div'), picker = doc.createElement('section'), rail = doc.createElement('nav'), chat = doc.createElement('div'), notificationStatus = doc.createElement('p');
+  notificationStatus.setAttribute('role', 'status'); notificationStatus.hidden = true;
+  container.replaceChildren(staffRoot, picker, inboxRoot, rail, notificationStatus, chat);
+  let notificationNavigation;
+  const followNotification = () => { void notificationNavigation?.openPending(); };
   const ownerAccess = verifiedSession.user.role === 'super_moderator'
     ? createOwnerAccessClient({endpoint:`${PREVIEW_ORIGIN}/api/chat-owner-access`,getToken:getMemberstackToken}) : undefined;
   const staffManagement = mountStaffManagement(staffRoot, { identity: verifiedSession.user, getSession, ownerAccess });
@@ -40,7 +44,23 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
     },
     mountChat: () => mountPreviewChat({ container: chat, inboxRoot, appId: '168437005e7f6fa2a', getSession, authorizeStudent, staffManagement }),
     mountNavigation: options => roomNavigation.mount({ ...options, root: rail, onChangeGroups: () => { doc.defaultView.location.hash = 'choose-groups'; doc.defaultView.location.reload(); } }),
-    clear: () => { staffManagement?.dispose(); container.replaceChildren(); },
+    onChatReady: async mounted => {
+      notificationNavigation = createNotificationNavigation({
+        readHash: () => doc.defaultView.location.hash,
+        consumeHash: hash => {
+          if (doc.defaultView.location.hash === hash) doc.defaultView.history.replaceState(null, '', doc.defaultView.location.pathname + doc.defaultView.location.search);
+        },
+        getSession,
+        openConversation: uid => mounted.open('user', uid),
+        status: text => { notificationStatus.textContent = text; notificationStatus.hidden = !text; },
+      });
+      doc.defaultView.addEventListener('hashchange', followNotification);
+      await notificationNavigation.openPending();
+    },
+    clear: () => {
+      notificationNavigation?.dispose(); doc.defaultView.removeEventListener('hashchange', followNotification);
+      staffManagement?.dispose(); container.replaceChildren();
+    },
   });
   try { await flow.start({ chooseGroups: doc.defaultView.location.hash === '#choose-groups', verifiedSession }); return flow; }
   catch (error) { await flow.dispose(); throw error; }
