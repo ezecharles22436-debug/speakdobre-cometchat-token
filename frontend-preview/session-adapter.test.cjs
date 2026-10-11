@@ -80,6 +80,19 @@ test('staff directory authentication does not render, send, or open a room', asy
 test('students cannot initialize the staff directory SDK session', async () => {
   const f=fixture();await assert.rejects(f.adapter.prepareStaff());assert.ok(!f.events.includes('login'));
 });
+
+test('student inbox connection authenticates without opening a room or rendering messages', async () => {
+  const f=fixture();const ready=await f.adapter.prepareStudent();
+  assert.equal(ready.user.role,'student');assert.deepEqual(f.events,['login']);assert.deepEqual(f.rendered,[]);
+});
+
+test('student inbox connection preserves identity, role, entitlement and disposal gates', async () => {
+  for(const mutate of [()=>null,s=>({...s,user:{uid:'other',role:'student'}}),s=>({...s,user:{uid:s.user.uid,role:'moderator'}})]){
+    let reads=0;const f=fixture(async()=>++reads===1?session():mutate(session()));
+    await assert.rejects(f.adapter.prepareStudent());assert.ok(f.events.includes('logout'));assert.deepEqual(f.rendered,[]);
+  }
+  const staff=fixture(async()=>staffSession());await assert.rejects(staff.adapter.prepareStudent());assert.ok(!staff.events.includes('login'));
+});
 test('staff directory identity and role changes during login fail closed', async () => {
   for(const mutate of [s=>({...s,user:{uid:'other',role:'moderator'}}),s=>({...s,user:{uid:'test_student',role:'student'}})]) {
     let reads=0;const f=fixture(async()=>++reads===1?staffSession():mutate(staffSession()));

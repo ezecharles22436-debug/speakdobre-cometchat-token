@@ -1,4 +1,21 @@
 .sd-isolated-chat { width:100%; min-width:0; height:min(760px,85dvh); color:#142442; font-family:Arial,sans-serif; }
+.sd-student-inbox { margin-block:0 14px; font-family:Arial,sans-serif; color:#142442; }
+.sd-student-inbox:empty { display:none; }
+.sd-inbox-toolbar { display:flex; justify-content:flex-end; }
+.sd-student-inbox button { min-height:44px; padding:10px 16px; border:1px solid #b7c7dc; border-radius:12px; background:white; color:#142442; cursor:pointer; font:inherit; }
+.sd-student-inbox button:focus-visible { outline:3px solid #087cca; outline-offset:3px; }
+.sd-student-inbox button:disabled { opacity:.65; cursor:wait; }
+.sd-inbox-toolbar button { display:flex; align-items:center; gap:10px; font-weight:700; }
+.sd-inbox-badge { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; box-sizing:border-box; padding-inline:6px; border-radius:20px; background:#087cca; color:white; font-size:12px; font-weight:700; flex-shrink:0; }
+.sd-student-inbox [hidden] { display:none !important; }
+.sd-student-inbox>section { margin-top:10px; padding:20px; border:1px solid #dce4f0; border-radius:16px; background:#f9fbff; }
+.sd-student-inbox h2 { margin:0 0 8px; font-size:22px; }
+.sd-student-inbox p { color:#526582; line-height:1.5; }
+.sd-inbox-list { display:grid; gap:8px; max-height:340px; overflow:auto; padding:3px; }
+.sd-student-inbox .sd-inbox-row { display:flex; align-items:center; justify-content:space-between; gap:12px; text-align:left; padding:14px; width:100%; }
+.sd-inbox-row>span:first-child { display:grid; gap:6px; min-width:0; overflow-wrap:anywhere; }
+.sd-inbox-row>span:first-child>span { color:#526582; font-size:14px; line-height:1.4; }
+@media(max-width:600px) { .sd-student-inbox>section { padding:14px; } .sd-inbox-toolbar { justify-content:stretch; } .sd-inbox-toolbar>button { width:100%; justify-content:center; } }
 .sd-isolated-chat .cometchat { height:100%; min-width:0; --cometchat-primary-color:#087cca; }
 .sd-message-panel { display:flex; flex-direction:column; height:100%; min-height:0; min-width:0; overflow:hidden; border:1px solid #dce4f0; border-radius:20px; background:white; }
 .sd-message-list { flex:1; min-height:0; overflow:hidden; }

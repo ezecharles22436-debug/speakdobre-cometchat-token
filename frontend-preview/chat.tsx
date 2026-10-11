@@ -14,6 +14,7 @@ import { createOutgoingCalls } from './outgoing-calls.mjs';
 import { mountPreviewCall } from './call-host';
 import { mountStudentPicker } from './student-picker.mjs';
 import { mountStudentDirectory } from './student-directory.mjs';
+import { mountStudentInbox, conversationSummary } from './student-inbox.mjs';
 import { moderateGroupMember } from './member-moderation.mjs';
 import { ReportProvider as CometChatProvider } from './report-provider';
 export { mountPreviewCall } from './call-host';
@@ -22,10 +23,11 @@ export { createStaffTargetClient } from './staff-target-client.mjs';
 type Session = { token: string; user: { uid: string; role: string }; rooms: { guid: string; name: string; unlocked: boolean }[]; staffContacts: string[] };
 type View = { type: 'group' | 'user'; id: string; role: string; canStartCalls: boolean; roomGuid?: string };
 
-// Isolated integration entry point, not imported by Webflow. No automatic login.
+// Isolated entry point. Student inbox connects only after server entitlement checks.
 // The host must retain the existing server-confirmed group selector before mounting.
-export async function mountPreviewChat({ container, appId, getSession, authorizeStudent, staffManagement }: {
+export async function mountPreviewChat({ container, inboxRoot, appId, getSession, authorizeStudent, staffManagement }: {
   container: HTMLElement; appId: string; getSession: () => Promise<Session>;
+  inboxRoot?: HTMLElement;
   authorizeStudent?: (target:{uid:string;roomGuid:string}) => Promise<any>;
   staffManagement?: {content:HTMLElement;directoryRoot:HTMLElement;bindDirectory:(open:()=>Promise<boolean>)=>void;closeDirectory:()=>void;clear:()=>void;setGroup:(name:string)=>void} | null;
 }) {
@@ -45,6 +47,8 @@ export async function mountPreviewChat({ container, appId, getSession, authorize
   let activeCall: ReturnType<typeof mountPreviewCall> | undefined;
   let outgoing: ReturnType<typeof createOutgoingCalls> | undefined;
   let removeStudentPicker: (()=>void) | undefined;
+  let inbox: ReturnType<typeof mountStudentInbox> | undefined;
+  let studentReady: Promise<Session> | undefined;
   const clear = () => {
     removeStudentPicker?.();removeStudentPicker=undefined;
     staffManagement?.clear();
@@ -61,6 +65,7 @@ export async function mountPreviewChat({ container, appId, getSession, authorize
       const version = generation;
       const entity = view.type === 'group' ? { group: await CometChat.getGroup(view.id) } : { user: await CometChat.getUser(view.id) };
       if (version !== generation) return;
+      inbox?.close();
       if(view.canStartCalls&&view.type==='group'&&authorizeStudent){
         staffManagement?.setGroup(entity.group?.getName() || view.id);
         removeStudentPicker=mountStudentPicker(staffManagement?.content || studentPicker,{
@@ -135,5 +140,41 @@ export async function mountPreviewChat({ container, appId, getSession, authorize
   }) : null;
   if (directory) staffManagement?.bindDirectory(directory.open);
   clear();
-  return { open: adapter.open, async dispose() { directory?.dispose(); try { await adapter.dispose(); } finally { root.unmount(); container.replaceChildren(); } } };
+  const studentSession = inboxRoot && !staffManagement ? await getSession() : null;
+  if (inboxRoot && studentSession?.user.role === 'student') {
+    const listenerId = `sd-student-inbox-${studentSession.user.uid}`;
+    const bounded = <T,>(operation: Promise<T>): Promise<T> => new Promise((resolve,reject) => {
+      const timer=setTimeout(()=>reject(Error('Metadata timeout')),8000);
+      operation.then(value=>{clearTimeout(timer);resolve(value);},error=>{clearTimeout(timer);reject(error);});
+    });
+    studentReady = adapter.prepareStudent();
+    let initialConnection = studentReady;
+    inbox = mountStudentInbox(inboxRoot, {
+      identity: studentSession.user, getSession, prepare: () => {
+        if(initialConnection){const initial=initialConnection;initialConnection=undefined;return initial;}
+        return adapter.prepareStudent();
+      },
+      readContact: async (uid:string) => {
+        const [user,conversation] = await Promise.allSettled([
+          bounded(CometChat.getUser(uid)), bounded(CometChat.getConversation(uid,'user')),
+        ]);
+        const summary=conversationSummary(uid,user.status==='fulfilled'?user.value:null,conversation.status==='fulfilled'?conversation.value:null);
+        if(conversation.status==='rejected')summary.preview='Відкрити особисту розмову';
+        return summary;
+      },
+      subscribe: ({message,logout}: {message:(message:any)=>void;logout:()=>void}) => {
+        CometChat.addMessageListener(listenerId,new CometChat.MessageListener({onTextMessageReceived:message,onMediaMessageReceived:message,onCustomMessageReceived:message}));
+        CometChat.addLoginListener(listenerId,new CometChat.LoginListener({logoutSuccess:logout}));
+        return () => { CometChat.removeMessageListener(listenerId); CometChat.removeLoginListener(listenerId); };
+      },
+      onSelect: (uid:string) => adapter.open('user',uid),
+      onOpened: () => { messages.setAttribute('tabindex','-1'); messages.focus({preventScroll:true}); messages.scrollIntoView({block:'nearest'}); },
+    });
+    // Do not block usable room navigation on optional conversation metadata.
+    void inbox.start();
+  }
+  return { async open(type:string,id:string,roomGuid?:string,session?:Session) {
+    // A first room click waits for the same login; it cannot race the inbox.
+    await studentReady?.catch(()=>{}); return adapter.open(type,id,roomGuid,session);
+  }, async dispose() { inbox?.dispose(); directory?.dispose(); try { await adapter.dispose(); } finally { root.unmount(); container.replaceChildren(); } } };
 }

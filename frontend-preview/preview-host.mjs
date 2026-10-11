@@ -16,8 +16,8 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
   // Validate account and entitlement before changing the host area or initializing SDK.
   const verifiedSession = await getSession();
   const doc = container.ownerDocument;
-  const staffRoot = doc.createElement('div'), picker = doc.createElement('section'), rail = doc.createElement('nav'), chat = doc.createElement('div');
-  container.replaceChildren(staffRoot, picker, rail, chat);
+  const staffRoot = doc.createElement('div'), inboxRoot = doc.createElement('div'), picker = doc.createElement('section'), rail = doc.createElement('nav'), chat = doc.createElement('div');
+  container.replaceChildren(staffRoot, picker, inboxRoot, rail, chat);
   const ownerAccess = verifiedSession.user.role === 'super_moderator'
     ? createOwnerAccessClient({endpoint:`${PREVIEW_ORIGIN}/api/chat-owner-access`,getToken:getMemberstackToken}) : undefined;
   const staffManagement = mountStaffManagement(staffRoot, { identity: verifiedSession.user, getSession, ownerAccess });
@@ -38,7 +38,7 @@ export async function mountAuthenticatedPreview({ container, memberstack, roomSe
       picker.hidden = true;
       if (doc.defaultView.location.hash === '#choose-groups') doc.defaultView.history.replaceState(null, '', doc.defaultView.location.pathname + doc.defaultView.location.search);
     },
-    mountChat: () => mountPreviewChat({ container: chat, appId: '168437005e7f6fa2a', getSession, authorizeStudent, staffManagement }),
+    mountChat: () => mountPreviewChat({ container: chat, inboxRoot, appId: '168437005e7f6fa2a', getSession, authorizeStudent, staffManagement }),
     mountNavigation: options => roomNavigation.mount({ ...options, root: rail, onChangeGroups: () => { doc.defaultView.location.hash = 'choose-groups'; doc.defaultView.location.reload(); } }),
     clear: () => { staffManagement?.dispose(); container.replaceChildren(); },
   });
