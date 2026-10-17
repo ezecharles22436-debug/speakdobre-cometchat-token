@@ -115,11 +115,14 @@ test("forwards preferred messenger without changing goals, levels or eligibility
   global.fetch = async (_url, options) => { delivered = JSON.parse(options.body); return { ok: true }; };
   try {
     const res=response();
-    await handler(request({contactMethod:'telegram',contactValue:'student_name'}),res);
+    await handler(request({contactMethod:'telegram',contactValue:'student_name',referralSource:'recommendation'}),res);
     assert.equal(res.statusCode,200);
     assert.equal(delivered.contactValue,'@student_name');
     assert.equal(delivered.contactLabel,'Telegram');
     assert.equal(delivered.contactSummary,'Telegram: @student_name');
+    assert.equal(delivered.referralSource,'recommendation');
+    assert.equal(delivered.referralSourceLabel,'Рекомендація');
+    assert.equal(delivered.source,'speakdobre-home');
     assert.equal(delivered.englishLevel,request().body.englishLevel);
     assert.equal(delivered.goal,request().body.goal);
     assert.equal(delivered.consentVersion,'assessment-direct-contact-2026-10');
@@ -136,4 +139,16 @@ test("invalid messenger is rejected without any external delivery", async () => 
     const res=response();await handler(request({contactMethod:'whatsapp',contactValue:'0671234567'}),res);
     assert.equal(res.statusCode,400);assert.equal(res.body.code,'INVALID_CONTACT');
   } finally {global.fetch=originalFetch}
+});
+
+test('referral source is optional for old and new forms and all six choices are allowlisted',()=>{
+  const {assessmentReferral}=require('../api/_assessment-contact');
+  for(const source of [undefined,''])assert.deepEqual(assessmentReferral({referralSource:source}),{referralSource:'',referralSourceLabel:'Не вказано'});
+  for(const [source,label] of Object.entries({instagram:'Instagram',facebook:'Facebook',youtube:'YouTube',threads:'Threads',recommendation:'Рекомендація',other:'Інше'}))assert.deepEqual(assessmentReferral({referralSource:source}),{referralSource:source,referralSourceLabel:label});
+  for(const source of ['__proto__','constructor','tiktok','Instagram','<script>',123,null,[]])assert.equal(assessmentReferral({referralSource:source}),null);
+});
+
+test('invalid referral is rejected before any external delivery',async()=>{
+  const originalFetch=global.fetch;global.fetch=async()=>{throw Error('must not call external services')};
+  try{const res=response();await handler(request({referralSource:'invalid'}),res);assert.equal(res.statusCode,400);assert.equal(res.body.code,'INVALID_REFERRAL')}finally{global.fetch=originalFetch}
 });

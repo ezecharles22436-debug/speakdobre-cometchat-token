@@ -9,7 +9,7 @@ const LEVELS = new Set([
 ]);
 const AVAILABILITY = new Set(["Ранок", "День", "Вечір", "У будь-який час"]);
 const { persistAssessmentEligibility } = require("./_trial-booking-shared");
-const { assessmentContact } = require("./_assessment-contact");
+const { assessmentContact, assessmentReferral } = require("./_assessment-contact");
 
 module.exports = async function handler(req, res) {
   setCors(req, res);
@@ -36,6 +36,7 @@ module.exports = async function handler(req, res) {
       email: submission.email,
       phone: submission.phone,
       ...submission.contact,
+      ...submission.referral,
       englishLevel: submission.englishLevel,
       goal: submission.goal,
       availability: submission.availability,
@@ -82,8 +83,10 @@ function validateSubmission(body) {
   if (body.privacyConsent !== true) throw new HttpError(400, "Privacy consent is required.", "CONSENT_REQUIRED");
   const contact = assessmentContact(body, email);
   if (!contact) throw new HttpError(400, "Оберіть спосіб зв’язку та вкажіть коректний контакт: @username для Telegram або номер із кодом країни, наприклад +380…", "INVALID_CONTACT");
+  const referral=assessmentReferral(body);
+  if (!referral) throw new HttpError(400, "Оберіть один із запропонованих варіантів, звідки ви дізналися про SpeakDobre.", "INVALID_REFERRAL");
 
-  return { submissionId, name, email, phone, englishLevel, goal, availability, website, contact };
+  return { submissionId, name, email, phone, englishLevel, goal, availability, website, contact, referral };
 }
 
 function assertJsonRequest(req) {

@@ -1,5 +1,13 @@
 // No network calls. Kept independent from payments, accounts and trial bookings.
 const METHODS = Object.freeze({ telegram: 'Telegram', whatsapp: 'WhatsApp', viber: 'Viber', email: 'Електронна пошта' });
+const REFERRALS = Object.freeze({ instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', threads: 'Threads', recommendation: 'Рекомендація', other: 'Інше' });
+
+function assessmentReferral(body) {
+  const source=body.referralSource;
+  if(source===undefined||source==='')return {referralSource:'',referralSourceLabel:'Не вказано'};
+  if(typeof source!=='string'||!Object.hasOwn(REFERRALS,source))return null;
+  return {referralSource:source,referralSourceLabel:REFERRALS[source]};
+}
 
 function assessmentContact(body, email) {
   const legacy = body.contactMethod === undefined && body.contactValue === undefined;
@@ -20,4 +28,4 @@ function assessmentContact(body, email) {
   return { contactMethod: method, contactValue: value, contactLabel: METHODS[method], contactSummary: `${METHODS[method]}: ${value}`, contactSchemaVersion: 2 };
 }
 
-module.exports = { assessmentContact };
+module.exports = { assessmentContact, assessmentReferral };
