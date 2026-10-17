@@ -9,6 +9,7 @@ const LEVELS = new Set([
 ]);
 const AVAILABILITY = new Set(["Ранок", "День", "Вечір", "У будь-який час"]);
 const { persistAssessmentEligibility } = require("./_trial-booking-shared");
+const { assessmentContact } = require("./_assessment-contact");
 
 module.exports = async function handler(req, res) {
   setCors(req, res);
@@ -34,11 +35,12 @@ module.exports = async function handler(req, res) {
       name: submission.name,
       email: submission.email,
       phone: submission.phone,
+      ...submission.contact,
       englishLevel: submission.englishLevel,
       goal: submission.goal,
       availability: submission.availability,
       privacyConsent: true,
-      consentVersion: "privacy-policy-2026-08",
+      consentVersion: submission.contact.contactSchemaVersion === 2 ? "assessment-direct-contact-2026-10" : "privacy-policy-2026-08",
       source: "speakdobre-home",
       submittedAt: new Date().toISOString()
     };
@@ -78,8 +80,10 @@ function validateSubmission(body) {
   if (!LEVELS.has(englishLevel)) throw new HttpError(400, "Select your English level.", "INVALID_LEVEL");
   if (!AVAILABILITY.has(availability)) throw new HttpError(400, "Select your availability.", "INVALID_AVAILABILITY");
   if (body.privacyConsent !== true) throw new HttpError(400, "Privacy consent is required.", "CONSENT_REQUIRED");
+  const contact = assessmentContact(body, email);
+  if (!contact) throw new HttpError(400, "Оберіть спосіб зв’язку та вкажіть коректний контакт: @username для Telegram або номер із кодом країни, наприклад +380…", "INVALID_CONTACT");
 
-  return { submissionId, name, email, phone, englishLevel, goal, availability, website };
+  return { submissionId, name, email, phone, englishLevel, goal, availability, website, contact };
 }
 
 function assertJsonRequest(req) {

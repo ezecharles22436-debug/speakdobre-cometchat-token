@@ -106,3 +106,34 @@ test("forwards only normalized fields and returns the stable submission ID", asy
     else process.env.ZAPIER_ASSESSMENT_WEBHOOK_URL = originalUrl;
   }
 });
+
+test("forwards preferred messenger without changing goals, levels or eligibility input", async () => {
+  const originalFetch = global.fetch;
+  const originalUrl = process.env.ZAPIER_ASSESSMENT_WEBHOOK_URL;
+  process.env.ZAPIER_ASSESSMENT_WEBHOOK_URL = "https://hooks.example.test/assessment";
+  let delivered;
+  global.fetch = async (_url, options) => { delivered = JSON.parse(options.body); return { ok: true }; };
+  try {
+    const res=response();
+    await handler(request({contactMethod:'telegram',contactValue:'student_name'}),res);
+    assert.equal(res.statusCode,200);
+    assert.equal(delivered.contactValue,'@student_name');
+    assert.equal(delivered.contactLabel,'Telegram');
+    assert.equal(delivered.contactSummary,'Telegram: @student_name');
+    assert.equal(delivered.englishLevel,request().body.englishLevel);
+    assert.equal(delivered.goal,request().body.goal);
+    assert.equal(delivered.consentVersion,'assessment-direct-contact-2026-10');
+  } finally {
+    global.fetch=originalFetch;
+    if(originalUrl===undefined)delete process.env.ZAPIER_ASSESSMENT_WEBHOOK_URL;else process.env.ZAPIER_ASSESSMENT_WEBHOOK_URL=originalUrl;
+  }
+});
+
+test("invalid messenger is rejected without any external delivery", async () => {
+  const originalFetch=global.fetch;
+  global.fetch=async()=>{throw Error('must not call external services')};
+  try {
+    const res=response();await handler(request({contactMethod:'whatsapp',contactValue:'0671234567'}),res);
+    assert.equal(res.statusCode,400);assert.equal(res.body.code,'INVALID_CONTACT');
+  } finally {global.fetch=originalFetch}
+});
