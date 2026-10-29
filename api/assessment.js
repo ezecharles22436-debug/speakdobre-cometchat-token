@@ -10,6 +10,7 @@ const LEVELS = new Set([
 const AVAILABILITY = new Set(["Ранок", "День", "Вечір", "У будь-який час"]);
 const { persistAssessmentEligibility } = require("./_trial-booking-shared");
 const { assessmentContact, assessmentReferral } = require("./_assessment-contact");
+const { assessmentLocation } = require("./_assessment-location");
 
 module.exports = async function handler(req, res) {
   setCors(req, res);
@@ -37,6 +38,7 @@ module.exports = async function handler(req, res) {
       phone: submission.phone,
       ...submission.contact,
       ...submission.referral,
+      ...submission.location,
       englishLevel: submission.englishLevel,
       goal: submission.goal,
       availability: submission.availability,
@@ -85,8 +87,10 @@ function validateSubmission(body) {
   if (!contact) throw new HttpError(400, "Оберіть спосіб зв’язку та вкажіть коректний контакт: @username для Telegram або номер із кодом країни, наприклад +380…", "INVALID_CONTACT");
   const referral=assessmentReferral(body);
   if (!referral) throw new HttpError(400, "Оберіть один із запропонованих варіантів, звідки ви дізналися про SpeakDobre.", "INVALID_REFERRAL");
+  const location = assessmentLocation(body);
+  if (!location) throw new HttpError(400, "Вкажіть країну, де ви зараз перебуваєте. Місто — необов’язково. Використовуйте до 80 символів без посилань і спеціальної розмітки.", "INVALID_LOCATION");
 
-  return { submissionId, name, email, phone, englishLevel, goal, availability, website, contact, referral };
+  return { submissionId, name, email, phone, englishLevel, goal, availability, website, contact, referral, location };
 }
 
 function assertJsonRequest(req) {
