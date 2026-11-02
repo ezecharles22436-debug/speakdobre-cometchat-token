@@ -1,4 +1,4 @@
-const shared = require('./_trial-booking-shared');
+const shared = require('./_platform-shared');
 const { getPracticeChatAccess } = require('./cometchat-token');
 const { ROOMS, roleForMember, SelectionError } = require('./_chat-room-policy');
 const { createRoomSelectionService, RoomChangeError } = require('./_chat-room-selection');

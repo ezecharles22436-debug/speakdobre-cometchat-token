@@ -107,7 +107,7 @@ test("forwards only normalized fields and returns the stable submission ID", asy
   }
 });
 
-test("forwards preferred messenger without changing goals, levels or eligibility input", async () => {
+test("forwards preferred messenger without changing goals or levels", async () => {
   const originalFetch = global.fetch;
   const originalUrl = process.env.ZAPIER_ASSESSMENT_WEBHOOK_URL;
   process.env.ZAPIER_ASSESSMENT_WEBHOOK_URL = "https://hooks.example.test/assessment";
@@ -129,6 +129,38 @@ test("forwards preferred messenger without changing goals, levels or eligibility
   } finally {
     global.fetch=originalFetch;
     if(originalUrl===undefined)delete process.env.ZAPIER_ASSESSMENT_WEBHOOK_URL;else process.env.ZAPIER_ASSESSMENT_WEBHOOK_URL=originalUrl;
+  }
+});
+
+test('manual assessment delivery has no booking or Firebase dependency even with legacy booking enabled', async () => {
+  const names = ['TRIAL_BOOKING_ENABLED', 'TRIAL_ELIGIBILITY_HMAC_SECRET', 'FIREBASE_PRIVATE_KEY', 'ZAPIER_ASSESSMENT_WEBHOOK_URL'];
+  const previous = Object.fromEntries(names.map(name => [name, process.env[name]]));
+  const originalFetch = global.fetch;
+  process.env.TRIAL_BOOKING_ENABLED = 'true';
+  delete process.env.TRIAL_ELIGIBILITY_HMAC_SECRET;
+  delete process.env.FIREBASE_PRIVATE_KEY;
+  process.env.ZAPIER_ASSESSMENT_WEBHOOK_URL = 'https://hooks.example.test/manual-assessment';
+  const calls = [];
+  global.fetch = async (url, options) => {
+    calls.push({url, body: JSON.parse(options.body)});
+    assert.equal(url, process.env.ZAPIER_ASSESSMENT_WEBHOOK_URL);
+    return {ok: true};
+  };
+  try {
+    const res = response();
+    await handler(request({contactMethod:'telegram', contactValue:'student_name', referralSource:'instagram', locationSchemaVersion:1, currentCountry:'Україна', currentCity:'Львів'}), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].body.contactSummary, 'Telegram: @student_name');
+    assert.equal(calls[0].body.referralSource, 'instagram');
+    assert.equal(calls[0].body.currentCountry, 'Україна');
+    assert.equal(calls[0].body.currentCity, 'Львів');
+    assert.equal(calls[0].body.event, 'assessment-request');
+  } finally {
+    global.fetch = originalFetch;
+    for (const [name,value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
   }
 });
 

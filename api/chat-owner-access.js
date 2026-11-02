@@ -1,4 +1,4 @@
-const shared = require('./_trial-booking-shared');
+const shared = require('./_platform-shared');
 const { trustedStaffConfig } = require('./_chat-room-staff');
 const { roleForMember } = require('./_chat-room-policy');
 const { roomReleaseReady } = require('./_chat-room-release');

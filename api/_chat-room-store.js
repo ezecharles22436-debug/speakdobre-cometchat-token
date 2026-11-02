@@ -1,5 +1,5 @@
 const { randomUUID } = require('node:crypto');
-const firestore = require('./_trial-booking-shared');
+const firestore = require('./_platform-shared');
 const { assertChatAccess } = require('./_chat-suspension');
 
 function createRoomStore(db = firestore, namespace = process.env.CHAT_ROOMS_DATA_NAMESPACE) {

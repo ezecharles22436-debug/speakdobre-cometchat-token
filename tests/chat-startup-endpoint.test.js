@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const shared = require('../api/_trial-booking-shared');
+const shared = require('../api/_platform-shared');
 const handler = require('../api/cometchat-token');
 
 test('consolidated student startup checks access once and memberships once; pending state is preserved', async () => {
