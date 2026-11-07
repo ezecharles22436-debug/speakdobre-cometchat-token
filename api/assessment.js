@@ -39,6 +39,7 @@ function createHandler({ deliver: sendAssessment = deliver, deliveryStore, origi
     try {
       await sendAssessment({
         ...payload,
+        referralSourceLabel: shortReferralLabel(payload.attribution),
         deliveryReference: lock.documentId,
         submittedAt: new Date(now()).toISOString()
       });
@@ -207,6 +208,15 @@ function assessmentAttribution(input) {
     if (value.length <= 120 && /^[\p{L}\p{N}][\p{L}\p{N}_.+ -]*$/u.test(value)) result[field] = value;
   }
   return result;
+}
+
+function shortReferralLabel(attribution) {
+  const tags = ATTRIBUTION_FIELDS
+    .filter(field => Object.hasOwn(attribution, field))
+    .map(field => `${field.slice(4)}=${attribution[field]}`);
+  const prefix = "Не запитували. Форма: рекламна сторінка уроків.";
+  if (!tags.length) return `${prefix} Позначок UTM немає.`;
+  return `${prefix} UTM ${tags.join(" · ")}. Це позначки посилання, рекламний перехід не перевірено.`;
 }
 
 function reconciliationRequired() {
@@ -434,4 +444,5 @@ module.exports = createHandler();
 module.exports.createHandler = createHandler;
 module.exports.createAssessmentDeliveryStore = createAssessmentDeliveryStore;
 module.exports._test = { validateSubmission, isEmail, isUuid, MAX_BODY_BYTES };
+
 
