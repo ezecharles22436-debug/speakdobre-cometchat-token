@@ -16,45 +16,57 @@ const LEVELS = new Set([
 const AVAILABILITY = new Set(["Ранок", "День", "Вечір", "У будь-який час"]);
 const { assessmentContact, assessmentReferral } = require("./_assessment-contact");
 const { assessmentLocation } = require("./_assessment-location");
+const { assessmentMeasurement, outgoingMeasurement, acceptedResponse } = require("./_assessment-measurement");
 
-function createHandler({ deliver: sendAssessment = deliver, deliveryStore, origins, now = Date.now, logError = console.error } = {}) {
+function createHandler({ deliver: sendAssessment = deliver, deliveryStore, measurementDeliveryStore, origins, now = Date.now, logError = console.error } = {}) {
   let shortStore = deliveryStore;
+  let legacyMeasurementStore = measurementDeliveryStore;
 
-  async function sendShortOnce(payload) {
+  async function sendOnce(payload, measurement, isShort) {
     // Fail before creating a claim when no outbound destination is configured.
     if (sendAssessment === deliver) assertDeliveryConfigured(true);
-    if (!shortStore) shortStore = createAssessmentDeliveryStore({ now });
-    const lock = await shortStore.claim(payload);
+    if (isShort && !shortStore) shortStore = createAssessmentDeliveryStore({ now });
+    if (!isShort && !legacyMeasurementStore) {
+      legacyMeasurementStore = createAssessmentDeliveryStore({
+        now,
+        namespace: process.env.VERCEL_ENV === "preview"
+          ? "preview_assessment_measurement_delivery_v1" : "assessment_measurement_delivery_v1",
+        formVersionKey: "legacy_assessment_measurement_v1"
+      });
+    }
+    const store = isShort ? shortStore : legacyMeasurementStore;
+    const lock = await store.claim(payload, measurement);
     if (lock.accepted) return;
 
     let sending;
     try {
-      sending = await shortStore.beginSend(lock);
+      sending = await store.beginSend(lock);
     } catch (error) {
       // No webhook invocation occurred, so releasing this owner is safe.
-      await shortStore.releaseBeforeSend(lock).catch(() => {});
+      await store.releaseBeforeSend(lock).catch(() => {});
       throw reconciliationRequired();
     }
 
     try {
-      await sendAssessment({
+      const outgoing = {
         ...payload,
-        referralSourceLabel: shortReferralLabel(payload.attribution),
         deliveryReference: lock.documentId,
         submittedAt: new Date(now()).toISOString()
-      });
+      };
+      if (isShort) outgoing.referralSourceLabel = shortReferralLabel(payload.attribution);
+      await sendAssessment(outgoingMeasurement(outgoing, measurement));
     } catch (error) {
       // A timeout or non-2xx acknowledgement may follow remote receipt.
-      await shortStore.flagForReconciliation(sending, "WEBHOOK_OUTCOME_UNKNOWN").catch(() => {});
+      await store.flagForReconciliation(sending, "WEBHOOK_OUTCOME_UNKNOWN").catch(() => {});
       throw reconciliationRequired();
     }
 
     try {
-      await shortStore.complete(sending);
+      await store.complete(sending);
     } catch (error) {
       // Re-read after an uncertain write before withholding acknowledgement.
-      if (await shortStore.isAccepted(sending).catch(() => false)) return;
-      await shortStore.flagForReconciliation(sending, "ACCEPTANCE_WRITE_UNKNOWN").catch(() => {});
+      if (await store.isAccepted(sending).catch(() => false)) return;
+      await store.flagForReconciliation(sending, "ACCEPTANCE_WRITE_UNKNOWN").catch(() => {});
       throw reconciliationRequired();
     }
   }
@@ -77,12 +89,14 @@ function createHandler({ deliver: sendAssessment = deliver, deliveryStore, origi
       if (submission.website) return res.status(202).json({ ok: true });
 
       const payload = assessmentPayload(submission);
-      if (submission.formVersion === SHORT_FORM_VERSION) {
-        await sendShortOnce(payload);
+      const measurement = assessmentMeasurement(submission, req.body.measurement);
+      const isShort = submission.formVersion === SHORT_FORM_VERSION;
+      if (isShort || measurement.request) {
+        await sendOnce(payload, measurement, isShort);
       } else {
-        await sendAssessment({ ...payload, submittedAt: new Date(now()).toISOString() });
+        await sendAssessment(outgoingMeasurement({ ...payload, submittedAt: new Date(now()).toISOString() }, measurement));
       }
-      return res.status(200).json({ ok: true, submissionId: submission.submissionId });
+      return res.status(measurement.metadata.test ? 202 : 200).json(acceptedResponse(submission.submissionId, measurement));
     } catch (error) {
       logError("Assessment endpoint failed:", safeError(error));
       if (error instanceof HttpError) {
@@ -223,7 +237,7 @@ function reconciliationRequired() {
   return new HttpError(503, "Delivery needs confirmation. Keep this submission identifier and contact support.", "DELIVERY_RECONCILIATION_REQUIRED");
 }
 
-function createAssessmentDeliveryStore({ db, now = Date.now, namespace } = {}) {
+function createAssessmentDeliveryStore({ db, now = Date.now, namespace, formVersionKey = SHORT_FORM_VERSION } = {}) {
   const collection = namespace || (process.env.VERCEL_ENV === "preview"
     ? "preview_assessment_short_delivery_v1"
     : "assessment_short_delivery_v1");
@@ -254,9 +268,11 @@ function createAssessmentDeliveryStore({ db, now = Date.now, namespace } = {}) {
   }
 
   return {
-    async claim(payload) {
-      const documentId = sha256(`${SHORT_FORM_VERSION}:${payload.submissionId.toLowerCase()}`);
-      const requestHash = sha256(JSON.stringify(payload));
+    async claim(payload, measurement) {
+      const documentId = sha256(`${formVersionKey}:${payload.submissionId.toLowerCase()}`);
+      // Keep the deployed v1 fingerprint exactly when no measurement was supplied.
+      const fingerprint = measurement?.request ? { ...payload, measurement: measurement.request } : payload;
+      const requestHash = sha256(JSON.stringify(fingerprint));
       const timestamp = now();
       const operationToken = randomUUID();
       const fields = {
@@ -269,6 +285,7 @@ function createAssessmentDeliveryStore({ db, now = Date.now, namespace } = {}) {
         leaseUntil: timestamp + CLAIM_LEASE_MS,
         reason: ""
       };
+      if (measurement) fields.measurement = measurement.metadata;
       try {
         const record = await database().createDocument(collection, documentId, fields);
         return lockFor(documentId, record);
@@ -444,5 +461,4 @@ module.exports = createHandler();
 module.exports.createHandler = createHandler;
 module.exports.createAssessmentDeliveryStore = createAssessmentDeliveryStore;
 module.exports._test = { validateSubmission, isEmail, isUuid, MAX_BODY_BYTES };
-
 
