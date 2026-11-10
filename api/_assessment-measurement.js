@@ -92,11 +92,13 @@ function staffMeasurementLabel(original, metadata) {
     : "Звичайна заявка."];
   for (const [field, label] of [["firstTouch", "Перший перехід"], ["lastTouch", "Останній перехід"]]) {
     if (!metadata[field]) continue;
-    const tags = [...UTM_FIELDS, ...CAMPAIGN_FIELDS]
+    const tags = [...UTM_FIELDS, ...CAMPAIGN_FIELDS, "referrerHost", "landingPath"]
       .filter(key => Object.hasOwn(metadata[field], key))
       .map(key => `${key}=${metadata[field][key]}`);
+    if (!metadata[field].ad_id) tags.push("числовий ad_id не передано; точне оголошення не визначено");
     if (tags.length) parts.push(`${label}: ${tags.join(" · ")}.`);
   }
+  if (!metadata.firstTouch && !metadata.lastTouch) parts.push("Числовий ad_id не передано; точне оголошення не визначено.");
   if (metadata.firstTouch || metadata.lastTouch) parts.push("Позначки посилання; рекламний перехід не підтверджено.");
   return parts.filter(Boolean).join(" ");
 }

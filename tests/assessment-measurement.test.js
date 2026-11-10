@@ -77,6 +77,8 @@ test("accepted real enquiry shares one server ID with durable safe metadata and 
   assert.match(payload.referralSourceLabel, new RegExp(shortId));
   assert.match(payload.referralSourceLabel, /Перший перехід:.*campaign_id=120249175874320417/);
   assert.match(payload.referralSourceLabel, /Останній перехід:.*adgroup_id=1881010098223778/);
+  assert.match(payload.referralSourceLabel, /referrerHost=l.instagram.com/);
+  assert.match(payload.referralSourceLabel, /landingPath=\/english-lessons-ad/);
   assert.match(payload.referralSourceLabel, /рекламний перехід не підтверджено/);
   assert.doesNotMatch(payload.referralSourceLabel, /opaque_Fb|opaque_Tt|student@example/);
   const record = [...check.db.documents.values()][0];
@@ -87,6 +89,30 @@ test("accepted real enquiry shares one server ID with durable safe metadata and 
   for (const privateValue of [shortBody.name, shortBody.contactValue, submissionId, "Practice"]) {
     assert.equal(stored.includes(privateValue), false);
   }
+});
+
+test("staff text shows sanitized host/path and explicitly marks missing ad identity per touch", async () => {
+  const check = fixture();
+  const measurement = {
+    schemaVersion: 1,
+    firstTouch: { referrerHost: "l.instagram.com", landingPath: "/english-lessons-ad", capturedAt: "2026-11-11T09:15:00.000Z" },
+    lastTouch: { utm_source: "tiktok", landingPath: "/english-lessons-ad", capturedAt: "2026-11-11T09:45:00.000Z" }
+  };
+  assert.equal((await check.submit({ ...shortBody, measurement })).statusCode, 200);
+  const label = check.calls[0].referralSourceLabel;
+  assert.match(label, /Перший перехід: referrerHost=l.instagram.com · landingPath=\/english-lessons-ad/);
+  assert.match(label, /Останній перехід: utm_source=tiktok · landingPath=\/english-lessons-ad/);
+  assert.equal(label.match(/числовий ad_id не передано/g).length, 2);
+  assert.equal(check.calls[0].measurement.firstTouch.ad_id, undefined);
+  assert.equal(check.calls[0].measurement.lastTouch.ad_id, undefined);
+});
+
+test("staff text marks unavailable ad identity when no measurement was captured", async () => {
+  const check = fixture();
+  await check.submit(shortBody);
+  assert.match(check.calls[0].referralSourceLabel, /Числовий ad_id не передано; точне оголошення не визначено\./);
+  assert.equal(check.calls[0].measurement.firstTouch, undefined);
+  assert.equal(check.calls[0].measurement.lastTouch, undefined);
 });
 
 test("new measured requests replay across cold handlers without another notification or changing source", async () => {
