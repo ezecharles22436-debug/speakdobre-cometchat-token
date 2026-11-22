@@ -19,6 +19,7 @@ function roomRoleForMember(memberId, env = process.env) {
 }
 
 module.exports = async function handler(req, res) {
+  if(require('./_community-retirement').retired(req,res)) return;
   setCors(req, res);
 
   if (req.method === "OPTIONS") {

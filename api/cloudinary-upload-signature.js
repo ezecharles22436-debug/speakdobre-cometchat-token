@@ -4,6 +4,7 @@ const MEMBERSTACK_BASE_URL = "https://admin.memberstack.com";
 const SIGNATURE_TTL_SECONDS = 5 * 60;
 
 module.exports = async function handler(req, res) {
+  if(require('./_community-retirement').retired(req,res)) return;
   setCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") {

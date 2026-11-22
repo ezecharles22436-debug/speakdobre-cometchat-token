@@ -1,6 +1,7 @@
 const MEMBERSTACK_BASE_URL = "https://admin.memberstack.com";
 
 module.exports = async function handler(req, res) {
+  if(require('./_community-retirement').retired(req,res)) return;
   setCors(req, res);
 
   if (req.method === "OPTIONS") {

@@ -9,6 +9,7 @@ const { createSuspensionService } = require('./_chat-suspension');
 function createHandler(deps = {}) {
   const env = deps.env || process.env;
   return async (req, res) => {
+    if(require('./_community-retirement').retired(req,res,env)) return;
     shared.setCors(req, res, 'POST, OPTIONS'); res.setHeader('Cache-Control', 'no-store');
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Метод не підтримується.' });

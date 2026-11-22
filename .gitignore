@@ -1,3 +1,8 @@
 frontend-preview/node_modules/
 frontend-preview/browser-dist/
 frontend-preview/production-dist/
+
+node_modules/
+.env*
+.vercel/
+*verification*.txt

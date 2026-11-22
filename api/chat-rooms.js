@@ -11,6 +11,7 @@ const { selectionWindow } = require('./_chat-room-cooldown');
 function createHandler(deps = {}) {
   const env = deps.env || process.env;
   return async (req, res) => {
+    if(require('./_community-retirement').retired(req,res,env)) return;
     shared.setCors(req, res, 'GET, POST, OPTIONS');
     if (req.method === 'OPTIONS') return res.status(204).end();
     if (!['GET', 'POST'].includes(req.method)) {
