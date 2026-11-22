@@ -6,14 +6,15 @@ function retired(req,res,env=process.env) {
   return false;
  }
  const isolated=env.VERCEL_ENV==='preview' && env.VERCEL_GIT_COMMIT_REF==='codex/memberstack-retirement';
+ const production=env.VERCEL_ENV==='production' && env.VERCEL_GIT_COMMIT_REF==='main';
  res.setHeader('Cache-Control','no-store');
- if(req.headers?.origin==='https://speakdobre.webflow.io') {
-  res.setHeader('Access-Control-Allow-Origin','https://speakdobre.webflow.io');
+ if((production?['https://www.speakdobre.com','https://speakdobre.com']:['https://speakdobre.webflow.io']).includes(req.headers?.origin)) {
+  res.setHeader('Access-Control-Allow-Origin',req.headers.origin);
   res.setHeader('Vary','Origin');
   res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');
  }
- if(!isolated){res.status(503).json({error:'Перехід до спільноти ще не налаштовано.'});return true;}
+ if(!isolated&&!production){res.status(503).json({error:'Перехід до спільноти ще не налаштовано.'});return true;}
  if(req.method==='OPTIONS'){res.status(204).end();return true;}
  res.status(410).json({code:'COMMUNITY_MOVED',error:'Спільнота SpeakDobre тепер у Telegram. Реєстрація на сайті не потрібна.',communityUrl:'https://t.me/speakdobre_english'});
  return true;

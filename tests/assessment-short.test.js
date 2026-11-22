@@ -76,7 +76,7 @@ test("delivers a short email enquiry through the same event with matching ID aft
     contactSummary: "Електронна пошта: test@example.com",
     contactSchemaVersion: 2,
     referralSource: "",
-    referralSourceLabel: `Не запитували. Форма: рекламна сторінка уроків. UTM source=instagram · medium=paid_social · campaign=speakdobre_lessons_ua_20261103. Це позначки посилання, рекламний перехід не перевірено. Заявка: ${acknowledgement.enquiryId}. Звичайна заявка.`,
+    referralSourceLabel: `Не запитували. Форма: рекламна сторінка уроків. UTM source=instagram · medium=paid_social · campaign=speakdobre_lessons_ua_20261103. Це позначки посилання, рекламний перехід не перевірено. Заявка: ${acknowledgement.enquiryId}. Звичайна заявка. Числовий ad_id не передано; точне оголошення не визначено.`,
     currentCountry: "",
     currentCity: "",
     locationSummary: "Не вказано",
@@ -121,7 +121,7 @@ test("retains only bounded, safe campaign tags and ignores unrelated fields", as
     assert.equal(payload.url, undefined);
     assert.equal(payload.clickId, undefined);
     assert.equal(payload.referralSource, "");
-    assert.equal(payload.referralSourceLabel, `Не запитували. Форма: рекламна сторінка уроків. UTM source=youtube · content=p01-intro + A. Це позначки посилання, рекламний перехід не перевірено. Заявка: ${acknowledgement.enquiryId}. Звичайна заявка.`);
+    assert.equal(payload.referralSourceLabel, `Не запитували. Форма: рекламна сторінка уроків. UTM source=youtube · content=p01-intro + A. Це позначки посилання, рекламний перехід не перевірено. Заявка: ${acknowledgement.enquiryId}. Звичайна заявка. Числовий ad_id не передано; точне оголошення не визначено.`);
   });
   const attribution = JSON.parse('{"utm_source":" youtube ","utm_medium":"@student","utm_campaign":"=SUM(1)","utm_content":"p01-intro + A","utm_term":"https://example.test","gclid":"secret","__proto__":{"utm_term":"bad"}}');
   const result = await submit({ attribution, url: "https://example.test", clickId: "secret", referralSource: "instagram" });
@@ -135,7 +135,7 @@ test("the outgoing staff label keeps a byte-compatible durable request hash", as
   const submit = fixture(deliver, undefined, db);
   assert.equal((await submit()).statusCode, 200);
   assert.equal(outgoing.referralSource, "");
-  assert.equal(outgoing.referralSourceLabel, `Не запитували. Форма: рекламна сторінка уроків. Позначок UTM немає. Заявка: ${acknowledgement.enquiryId}. Звичайна заявка.`);
+  assert.equal(outgoing.referralSourceLabel, `Не запитували. Форма: рекламна сторінка уроків. Позначок UTM немає. Заявка: ${acknowledgement.enquiryId}. Звичайна заявка. Числовий ad_id не передано; точне оголошення не визначено.`);
   const { deliveryReference, submittedAt, enquiryId, technicalTest, leadEligible, measurementVersion, measurement, ...previousClaimPayload } = outgoing;
   previousClaimPayload.referralSourceLabel = "Не вказано";
   const previousHash = createHash("sha256").update(JSON.stringify(previousClaimPayload)).digest("hex");

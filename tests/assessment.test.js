@@ -121,7 +121,7 @@ test("forwards preferred messenger without changing goals or levels", async () =
     assert.equal(delivered.contactLabel,'Telegram');
     assert.equal(delivered.contactSummary,'Telegram: @student_name');
     assert.equal(delivered.referralSource,'recommendation');
-    assert.equal(delivered.referralSourceLabel,`Рекомендація Заявка: ${delivered.enquiryId}. Звичайна заявка.`);
+    assert.equal(delivered.referralSourceLabel,`Рекомендація Заявка: ${delivered.enquiryId}. Звичайна заявка. Числовий ad_id не передано; точне оголошення не визначено.`);
     assert.equal(delivered.source,'speakdobre-home');
     assert.equal(delivered.englishLevel,request().body.englishLevel);
     assert.equal(delivered.goal,request().body.goal);
